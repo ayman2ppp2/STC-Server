@@ -4,7 +4,7 @@ use actix_web::{get, App, HttpServer, Responder};
 async fn hello() -> impl Responder {
     "Hello from STC Actix server!"
 }
-
+ // this is the main function
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Render sets PORT env variable
