@@ -1,5 +1,5 @@
 # 1. Build stage
-FROM rust:1.80 as builder
+FROM rust:1 as builder
 
 # Install system dependencies
 RUN apt-get update && \
@@ -8,6 +8,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 COPY . .
+
+# Use nightly version to support edition 2024
+RUN rustup default nightly
 
 # Compile in release mode
 RUN cargo build --release
