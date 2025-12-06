@@ -1,7 +1,7 @@
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, web};
 
 async fn hello() -> impl Responder {
-    "Hello from STC Actix server!"
+    "Hello from STC Actix server!\n"
 }
 async fn health_check() -> impl Responder {
     HttpResponse::Ok()
@@ -29,8 +29,8 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
             .route("/", web::get().to(hello))
-            .route("/{health_check}", web::get().to(health_check))
-            .route("/{submit_invoice}", web::get().to(submit_invoice))
+            .route("/health_check", web::get().to(health_check))
+            .route("/submit_invoice", web::get().to(submit_invoice))
     })
     .bind(("0.0.0.0", port))?
     .run()
