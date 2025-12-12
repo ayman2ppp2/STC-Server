@@ -9,39 +9,39 @@ async fn hello() -> impl Responder {
 async fn health_check() -> impl Responder {
     HttpResponse::Ok()
 }
-// pub async fn get_invoices(db: web::Data<PgPool>) -> impl Responder {
-//     let result = sqlx::query_as::<_, Invoice>(
-//         r#"
-//         SELECT
-//             id,
-//             issue_date,
-//             invoice_type_code,
-//             document_currency_code,
-//             supplier_party_id,
-//             customer_party_id,
-//             tax_total_amount,
-//             tax_total_currency,
-//             line_extension_amount,
-//             tax_exclusive_amount,
-//             tax_inclusive_amount,
-//             payable_amount,
-//             raw_xml,
-//             created_at
-//         FROM invoices
-//         ORDER BY created_at DESC
-//         "#
-//     )
-//     .fetch_all(db.get_ref())
-//     .await;
+async fn get_invoices(db: web::Data<PgPool>) -> impl Responder {
+    let result = sqlx::query(
+        r#"
+        SELECT
+            id,
+            issue_date,
+            invoice_type_code,
+            document_currency_code,
+            supplier_party_id,
+            customer_party_id,
+            tax_total_amount,
+            tax_total_currency,
+            line_extension_amount,
+            tax_exclusive_amount,
+            tax_inclusive_amount,
+            payable_amount,
+            raw_xml,
+            created_at
+        FROM invoices
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(db.get_ref())
+    .await;
 
-//     match result {
-//         Ok(invoices) => HttpResponse::Ok().json(invoices),
-//         Err(e) => {
-//             eprintln!("DB error: {:?}", e);
-//             HttpResponse::InternalServerError().body("Failed to fetch invoices")
-//         }
-//     }
-// }
+    match result {
+        Ok(invoices) => HttpResponse::Ok().json(invoices.len()),
+        Err(e) => {
+            eprintln!("DB error: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to fetch invoices")
+        }
+    }
+}
 async fn submit_invoice(db: web::Data<PgPool>, body: String) -> actix_web::Result<HttpResponse> {
     // read body length and attempt to parse XML into our models::Invoice
     let length = body.len();
@@ -53,7 +53,7 @@ async fn submit_invoice(db: web::Data<PgPool>, body: String) -> actix_web::Resul
                 Ok(_) => {
                     println!("Saved invoice successfully");
                     Ok(HttpResponse::Ok()
-                        .body(format!("Received invoice with content-length: {}", length)))
+                        .body(format!("the invoice is saved successfully: {}", length)))
                 }
                 Err(e) => {
                     eprintln!("DB error saving invoice: {}", e);
@@ -240,13 +240,7 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Server running on port {}", port);
 
-    // create DB pool from DATABASE_URL env var or fall back to init_db.sh defaults
-    // init_db.sh defaults:
-    //   POSTGRES_USER=postgres
-    //   POSTGRES_PASSWORD=password
-    //   POSTGRES_DB=stc-server
-    //   POSTGRES_HOST=localhost
-    //   POSTGRES_PORT=5432
+   
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         let db_user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "postgres".to_string());
         let db_password =
@@ -273,7 +267,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/submit_invoice", web::post().to(submit_invoice))
-        // .route("/invoices", web::get().to(get_invoices))
+            .route("/invoices", web::get().to(get_invoices))
     })
     .bind(("0.0.0.0", port))?
     .run()
