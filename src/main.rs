@@ -1,6 +1,6 @@
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
-use sqlx::{PgPool, Row};
 use serde_json::Value as JsonValue;
+use sqlx::{PgPool, Row};
 mod models;
 
 async fn hello() -> impl Responder {
@@ -52,10 +52,8 @@ async fn submit_invoice(db: web::Data<PgPool>, body: String) -> actix_web::Resul
             match save_invoice(db.get_ref(), invoice, &body).await {
                 Ok(_) => {
                     println!("Saved invoice successfully");
-                    Ok(HttpResponse::Ok().body(format!(
-                        "Received invoice with content-length: {}",
-                        length
-                    )))
+                    Ok(HttpResponse::Ok()
+                        .body(format!("Received invoice with content-length: {}", length)))
                 }
                 Err(e) => {
                     eprintln!("DB error saving invoice: {}", e);
@@ -71,7 +69,11 @@ async fn submit_invoice(db: web::Data<PgPool>, body: String) -> actix_web::Resul
     }
 }
 
-async fn save_invoice(pool: &PgPool, invoice: models::Invoice, raw_xml: &str) -> Result<(), sqlx::Error> {
+async fn save_invoice(
+    pool: &PgPool,
+    invoice: models::Invoice,
+    raw_xml: &str,
+) -> Result<(), sqlx::Error> {
     // helper: we'll use .as_deref() and .as_ref() inline to borrow inner strings
 
     // insert supplier party (no transaction for now)
@@ -90,7 +92,8 @@ async fn save_invoice(pool: &PgPool, invoice: models::Invoice, raw_xml: &str) ->
     };
 
     // insert customer party
-    let customer_party_id: Option<i64> = if let Some(cust_wrap) = invoice.accounting_customer_party {
+    let customer_party_id: Option<i64> = if let Some(cust_wrap) = invoice.accounting_customer_party
+    {
         let p = cust_wrap.party;
         let row = sqlx::query("INSERT INTO parties (name, company_id, telephone, email) VALUES ($1,$2,$3,$4) RETURNING id")
             .bind(p.name.as_deref())
@@ -106,18 +109,41 @@ async fn save_invoice(pool: &PgPool, invoice: models::Invoice, raw_xml: &str) ->
 
     // invoice-level monetary fields
     let (tax_total_amount, tax_total_currency) = if let Some(tt) = invoice.tax_total {
-        (tt.tax_amount.as_ref().and_then(|a| a.value.clone()), tt.tax_amount.as_ref().and_then(|a| a.currency_id.clone()))
+        (
+            tt.tax_amount.as_ref().and_then(|a| a.value.clone()),
+            tt.tax_amount.as_ref().and_then(|a| a.currency_id.clone()),
+        )
     } else {
         (None, None)
     };
 
     let (line_extension_amount, _line_currency) = if let Some(lm) = &invoice.legal_monetary_total {
-        (lm.line_extension_amount.as_ref().and_then(|a| a.value.clone()), lm.line_extension_amount.as_ref().and_then(|a| a.currency_id.clone()))
-    } else { (None, None) };
+        (
+            lm.line_extension_amount
+                .as_ref()
+                .and_then(|a| a.value.clone()),
+            lm.line_extension_amount
+                .as_ref()
+                .and_then(|a| a.currency_id.clone()),
+        )
+    } else {
+        (None, None)
+    };
 
-    let tax_exclusive_amount = invoice.legal_monetary_total.as_ref().and_then(|l| l.tax_exclusive_amount.as_ref().and_then(|a| a.value.clone()));
-    let tax_inclusive_amount = invoice.legal_monetary_total.as_ref().and_then(|l| l.tax_inclusive_amount.as_ref().and_then(|a| a.value.clone()));
-    let payable_amount = invoice.legal_monetary_total.as_ref().and_then(|l| l.payable_amount.as_ref().and_then(|a| a.value.clone()));
+    let tax_exclusive_amount = invoice.legal_monetary_total.as_ref().and_then(|l| {
+        l.tax_exclusive_amount
+            .as_ref()
+            .and_then(|a| a.value.clone())
+    });
+    let tax_inclusive_amount = invoice.legal_monetary_total.as_ref().and_then(|l| {
+        l.tax_inclusive_amount
+            .as_ref()
+            .and_then(|a| a.value.clone())
+    });
+    let payable_amount = invoice
+        .legal_monetary_total
+        .as_ref()
+        .and_then(|l| l.payable_amount.as_ref().and_then(|a| a.value.clone()));
 
     // insert invoice (cast numeric fields to numeric in SQL; NULL is allowed)
     let _ = sqlx::query(
@@ -144,16 +170,41 @@ async fn save_invoice(pool: &PgPool, invoice: models::Invoice, raw_xml: &str) ->
     if let Some(lines) = invoice.invoice_lines {
         for line in lines {
             let line_id = line.id;
-            let quantity = line.invoiced_quantity.as_ref().and_then(|q| q.value.clone());
-            let unit_code = line.invoiced_quantity.as_ref().and_then(|q| q.unit_code.clone());
-            let line_ext_amount = line.line_extension_amount.as_ref().and_then(|a| a.value.clone());
-            let line_currency = line.line_extension_amount.as_ref().and_then(|a| a.currency_id.clone());
+            let quantity = line
+                .invoiced_quantity
+                .as_ref()
+                .and_then(|q| q.value.clone());
+            let unit_code = line
+                .invoiced_quantity
+                .as_ref()
+                .and_then(|q| q.unit_code.clone());
+            let line_ext_amount = line
+                .line_extension_amount
+                .as_ref()
+                .and_then(|a| a.value.clone());
+            let line_currency = line
+                .line_extension_amount
+                .as_ref()
+                .and_then(|a| a.currency_id.clone());
             let item_name = line.item.as_ref().and_then(|i| i.name.clone());
             let item_desc = line.item.as_ref().and_then(|i| i.description.clone());
-            let price_amount = line.price.as_ref().and_then(|p| p.price_amount.as_ref().and_then(|a| a.value.clone()));
-            let price_currency = line.price.as_ref().and_then(|p| p.price_amount.as_ref().and_then(|a| a.currency_id.clone()));
-            let tax_amount = line.tax_total.as_ref().and_then(|t| t.tax_amount.as_ref().and_then(|a| a.value.clone()));
-            let tax_percent = line.tax_total.as_ref().and_then(|t| t.tax_subtotal.as_ref().and_then(|s| s.tax_category.as_ref().and_then(|c| c.percent.clone())));
+            let price_amount = line
+                .price
+                .as_ref()
+                .and_then(|p| p.price_amount.as_ref().and_then(|a| a.value.clone()));
+            let price_currency = line
+                .price
+                .as_ref()
+                .and_then(|p| p.price_amount.as_ref().and_then(|a| a.currency_id.clone()));
+            let tax_amount = line
+                .tax_total
+                .as_ref()
+                .and_then(|t| t.tax_amount.as_ref().and_then(|a| a.value.clone()));
+            let tax_percent = line.tax_total.as_ref().and_then(|t| {
+                t.tax_subtotal
+                    .as_ref()
+                    .and_then(|s| s.tax_category.as_ref().and_then(|c| c.percent.clone()))
+            });
 
             let _ = sqlx::query(
                 "INSERT INTO invoice_lines (invoice_id, line_id, quantity, unit_code, line_extension_amount, line_currency, item_name, item_description, price_amount, price_currency, tax_amount, tax_percent) \
@@ -198,14 +249,23 @@ async fn main() -> std::io::Result<()> {
     //   POSTGRES_PORT=5432
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         let db_user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "postgres".to_string());
-        let db_password = std::env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "password".to_string());
+        let db_password =
+            std::env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "password".to_string());
         let db_name = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "stc-server".to_string());
         let db_host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
         let db_port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
-        format!("postgres://{}:{}@{}:{}/{}", db_user, db_password, db_host, db_port, db_name)
+        format!(
+            "postgres://{}:{}@{}:{}/{}",
+            db_user, db_password, db_host, db_port, db_name
+        )
     });
 
-    let pool = PgPool::connect(&database_url).await.expect(&format!("Failed to connect to Postgres: {}", database_url));
+    println!("PORT = {:?}", std::env::var("PORT"));
+    println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
+
+    let pool = PgPool::connect(&database_url)
+        .await
+        .expect(&format!("Failed to connect to Postgres: {}", database_url));
 
     HttpServer::new(move || {
         App::new()
@@ -213,7 +273,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/submit_invoice", web::post().to(submit_invoice))
-            // .route("/invoices", web::get().to(get_invoices))
+        // .route("/invoices", web::get().to(get_invoices))
     })
     .bind(("0.0.0.0", port))?
     .run()
