@@ -1,5 +1,5 @@
 ########## 1. Builder Stage ##########
-FROM rust:1 AS builder
+FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
@@ -11,18 +11,18 @@ RUN apt-get update && \
 # Use nightly for edition 2024
 RUN rustup default nightly
 
-# Install SQLX CLI in builder stage
+# Install SQLX CLI
 RUN cargo install --version="~0.7" sqlx-cli --no-default-features --features rustls,postgres
 
-# Copy Cargo files first for caching
+# Copy cargo files for caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create fake src to cache dependencies
+# Pre-build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN rm -rf src
 
-# Copy actual source code
+# Copy full project
 COPY . .
 
 # Build final binary
@@ -34,22 +34,21 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime OpenSSL + Postgres libs
+# Install SSL and postgres runtime libs
 RUN apt-get update && \
     apt-get install -y ca-certificates libssl-dev libpq5 && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy compiled server binary
+# Copy compiled server
 COPY --from=builder /app/target/release/stc-server /app/stc-server
 
-# Copy SQLX CLI from correct path
+# Copy SQLX CLI (glibc-compatible now)
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
 
-# Copy migrations directory
+# Copy migrations
 COPY --from=builder /app/migrations /app/migrations
 
 ENV PORT=8080
 EXPOSE 8080
 
-# Run migrations then start server
 CMD sh -c "sqlx migrate run && ./stc-server"
