@@ -2,11 +2,9 @@ use openssl::{asn1::Asn1Time, bn::BigNum, hash::MessageDigest, x509::{X509, X509
 
 use crate::config::crypto_config::Crypto;
 
-pub async fn sign(req : X509Req,crypto : Crypto) -> Result<X509,openssl::error::ErrorStack>{
+pub async fn sign(req : X509Req,crypto : &Crypto) -> Result<X509,openssl::error::ErrorStack>{
     let pubkey = req.public_key()?;
-    if !req.verify(&pubkey)?{
-      return Err(openssl::error::ErrorStack::get());
-    }
+    
     let mut builder = X509Builder::new()?;
     builder.set_version(2)?;
     let mut serial = BigNum::new()?;

@@ -1,3 +1,4 @@
+use crate::routes::enroll::enroll;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
@@ -70,8 +71,8 @@ async fn main() -> std::io::Result<()> {
         )
     });
 
-    println!("PORT = {:?}", std::env::var("PORT"));
-    println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
+    // println!("PORT = {:?}", std::env::var("PORT"));
+    // println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
 
     let pool = PgPool::connect(&database_url)
         .await
@@ -87,6 +88,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/submit_invoice", web::post().to(submit_invoice))
+            .route("/enroll", web::post().to(enroll))
     })
     .bind(("0.0.0.0", port))?
     .run()
