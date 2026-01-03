@@ -85,7 +85,8 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(crypto_data.clone()))
+            .app_data(crypto_data.clone())
+            .app_data(web::JsonConfig::default().limit(256 * 1024))
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/submit_invoice", web::post().to(submit_invoice))
