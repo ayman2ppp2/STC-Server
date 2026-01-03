@@ -5,6 +5,12 @@ pub struct EnrollDTO {
   pub csr_base64 : String,
 }
 
+#[derive(serde::Serialize)]
+pub struct EnrollResponse {
+  pub certificate_base64: String,
+  pub status: String,
+}
+
 pub struct IntermediateEnrollDto{
   pub csr : X509Req,
 }
@@ -19,3 +25,4 @@ impl EnrollDTO{
   }
 
 }
+
