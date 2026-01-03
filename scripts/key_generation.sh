@@ -97,6 +97,9 @@ base64 -w 0 "$SERVER_DIR/server.key" > "$B64_DIR/server.key.b64"
 base64 -w 0 "$SERVER_DIR/server.crt" > "$B64_DIR/server.crt.b64"
 base64 -w 0 "$ROOT_DIR/stc_root_ca.crt" > "$B64_DIR/stc_root_ca.crt.b64"
 
+
+
+
 echo
 echo "==> DONE"
 echo

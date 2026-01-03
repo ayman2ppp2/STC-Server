@@ -77,9 +77,10 @@ async fn main() -> std::io::Result<()> {
     let pool = PgPool::connect(&database_url)
         .await
         .expect(&format!("Failed to connect to Postgres: {}", database_url));
-    let crypto_config = Crypto::from_env()
-        .await
-        .expect("there is an erro in the reading of the crypto_config from env");
+    let crypto_config = match Crypto::from_env().await {
+        Ok(crypto_config) => crypto_config,
+        Err(e) => panic!("error in the reading of the crypto_config from env :{}", e),
+    };
     let crypto_data = web::Data::new(crypto_config);
     HttpServer::new(move || {
         App::new()
