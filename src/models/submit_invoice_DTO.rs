@@ -33,7 +33,7 @@ impl SubmitInvoiceDto {
       let invoice_hash = hex::decode(self.invoice_hash).map_err(|_| "invalid invioce hash")?;
       let invoice_signature = general_purpose::STANDARD.decode(self.signature_base64).map_err(|_| "invalid base64 signature")?;
       let certificate_bytes = general_purpose::STANDARD.decode(self.certificate_base64).map_err(|_| "invalid base64 certificate")?;
-      let certificate = X509::from_der(&certificate_bytes).map_err(|_| "invalid x509 certificate")?;
+      let certificate = X509::from_pem(&certificate_bytes).map_err(|_| "invalid x509 certificate")?;
       let public_key = certificate.public_key().map_err(|_| "certificate has no public key")?;
       Ok(IntermediateInvoiceDto{invoice_bytes,invoice_hash,invoice_signature,certificate,public_key})
     }
