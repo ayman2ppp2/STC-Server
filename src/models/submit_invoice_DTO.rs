@@ -46,7 +46,7 @@ impl IntermediateInvoiceDto {
     Ok(invoice)
   }
   pub fn compute_hash(&self) ->Result<Vec<u8>,openssl::error::ErrorStack>{
-    let digest =  hash(MessageDigest::sha256(), &self.invoice_hash)?;
+    let digest =  hash(MessageDigest::sha256(), &self.invoice_bytes)?;
     Ok(digest.to_vec())
   }
 }
