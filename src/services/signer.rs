@@ -1,10 +1,15 @@
-use openssl::{asn1::Asn1Time, bn::BigNum, hash::MessageDigest, x509::{X509, X509Builder, X509Req}};
+use openssl::{
+    asn1::Asn1Time,
+    bn::BigNum,
+    hash::MessageDigest,
+    x509::{self, X509, X509Builder, X509Req},
+};
 
 use crate::config::crypto_config::Crypto;
 
-pub async fn sign(req : X509Req,crypto : &Crypto) -> Result<X509,openssl::error::ErrorStack>{
+pub async fn sign(req: X509Req, crypto: &Crypto) -> Result<X509, openssl::error::ErrorStack> {
     let pubkey = req.public_key()?;
-    
+
     let mut builder = X509Builder::new()?;
     builder.set_version(2)?;
     let mut serial = BigNum::new()?;
@@ -23,5 +28,4 @@ pub async fn sign(req : X509Req,crypto : &Crypto) -> Result<X509,openssl::error:
     builder.sign(&crypto.private_key, MessageDigest::sha256())?;
 
     Ok(builder.build())
-
 }

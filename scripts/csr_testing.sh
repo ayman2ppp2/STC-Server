@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ENROLL_URL="https://stc-server.onrender.com/enroll"
+#"https://stc-server.onrender.com/enroll"
+ENROLL_URL="http://localhost:8080/enroll"
 TMP_DIR="$(mktemp -d)"
 
 KEY_FILE="$TMP_DIR/client.key"
@@ -19,8 +19,9 @@ openssl req -new \
   -subj "$SUBJECT"
 
 
+JSON_PAYLOAD=$(jq -n --arg csr "$(cat "$CSR_FILE")" '{csr:$csr}')
 
-JSON_PAYLOAD=$(printf '{"csr_base64":"%s"}' "$CSR_FILE")
+echo "$JSON_PAYLOAD" | jq .
 
 curl -v -X POST "$ENROLL_URL" \
   -H "Content-Type: application/json" \
