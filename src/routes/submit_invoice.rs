@@ -3,14 +3,16 @@ use openssl::memcmp;
 use serde_json::Value;
 use sqlx::{PgPool, Row};
 
-use crate::models::{
-    self,
-    submit_invoice_DTO::SubmitInvoiceDto,
+use crate::{
+    config::crypto_config::Crypto,
+    models::{self, submit_invoice_DTO::SubmitInvoiceDto},
+    services::pki_service::{verify_cert_with_ca, verify_signature_with_cert},
 };
 
 pub async fn submit_invoice(
     db_pool: web::Data<PgPool>,
     invoice_DTO: web::Json<SubmitInvoiceDto>,
+    crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let intermidate_DTO = invoice_DTO
         .into_inner()
@@ -27,13 +29,20 @@ pub async fn submit_invoice(
         .map_err(actix_web::error::ErrorBadRequest)?;
     // verify hash
     if !memcmp::eq(received_hash, &hash) {
-        return Err(actix_web::error::ErrorNotAcceptable("err"));
+        return Err(actix_web::error::ErrorNotAcceptable("hash mismatch"));
     }
-    // verify the certificate and extract the client public key
-
+    // verify the certificate
+    verify_cert_with_ca(&crypto.get_ref().certificate, &intermidate_DTO.certificate)
+        .await
+        .map_err(actix_web::error::ErrorBadRequest)?;
     // verify signature
-
-    // if valid return an OK and save the invoice else return the problem and descard the invoice
+    verify_signature_with_cert(
+        intermidate_DTO.invoice_hash,
+        intermidate_DTO.invoice_signature,
+        &intermidate_DTO.certificate,
+    )
+    .await.map_err(actix_web::error::ErrorBadRequest)?;
+    // if valid save the invoice and return an OK ,else return the problem and descard the invoice
     Ok(HttpResponse::Ok().finish())
     // match quick_xml::de::from_str::<invoice_model::Invoice>(&body) {
     //     Ok(invoice) => {
