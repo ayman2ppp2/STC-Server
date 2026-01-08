@@ -37,7 +37,7 @@ pub async fn verify_cert_with_ca(ca_crt : &X509, client_crt : &X509)-> Result<bo
 
 }
 
-pub async fn verify_signature_with_cert(recv_hash : Vec<u8>, sig :Vec<u8>,crt : &X509) -> Result<bool, String>{
+pub async fn verify_signature_with_cert(recv_hash : &Vec<u8>, sig :&Vec<u8>,crt : &X509) -> Result<bool, String>{
     let pkey = crt.public_key().map_err(|e|format!("failed to extract the public key from the provided cerificate : {}",e))?;
     let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey).map_err(|e|format!("failed to instantiate the verifier : {}",e))?;
 

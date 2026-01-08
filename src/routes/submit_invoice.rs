@@ -37,28 +37,39 @@ pub async fn submit_invoice(
         .map_err(actix_web::error::ErrorBadRequest)?;
     // verify signature
     verify_signature_with_cert(
-        intermidate_DTO.invoice_hash,
-        intermidate_DTO.invoice_signature,
+        &intermidate_DTO.invoice_hash,
+        &intermidate_DTO.invoice_signature,
         &intermidate_DTO.certificate,
     )
-    .await.map_err(actix_web::error::ErrorBadRequest)?;
+    .await
+    .map_err(actix_web::error::ErrorBadRequest)?;
     // if valid save the invoice and return an OK ,else return the problem and descard the invoice
-    Ok(HttpResponse::Ok().finish())
+    match intermidate_DTO.parse_invoice() {
+        Ok(invoice) => {
+            let raw_data = String::from_utf8(intermidate_DTO.invoice_bytes)
+                .expect("failed to convert the raw invoice bytes into a str");
+            match save_invoice(db_pool.get_ref(), &invoice, &raw_data).await {
+                Ok(_) => {
+                    println!("Saved invoice successfully");
+                    Ok(HttpResponse::Ok().body("the invoice is saved successfully"))
+                }
+                Err(e) => {
+                    eprintln!("DB error saving invoice: {}", e);
+                    Ok(HttpResponse::InternalServerError()
+                        .body(format!("Failed to save invoice: {}", e)))
+                }
+            }
+        }
+        Err(e) => {
+            Err(actix_web::error::ErrorBadRequest(e))
+        }
+    }
+
+    // Ok(HttpResponse::Ok().finish())
     // match quick_xml::de::from_str::<invoice_model::Invoice>(&body) {
     //     Ok(invoice) => {
     //         // attempt to persist the invoice in Postgres
-    //         match save_invoice(db.get_ref(), invoice, &body).await {
-    //             Ok(_) => {
-    //                 println!("Saved invoice successfully");
-    //                 Ok(HttpResponse::Ok()
-    //                     .body(format!("the invoice is saved successfully: {}", length)))
-    //             }
-    //             Err(e) => {
-    //                 eprintln!("DB error saving invoice: {}", e);
-    //                 Ok(HttpResponse::InternalServerError()
-    //                     .body(format!("Failed to save invoice: {}", e)))
-    //             }
-    //         }
+    //
     //     }
     //     Err(e) => {
     //         eprintln!("Failed to parse invoice XML: {}", e);
@@ -68,14 +79,14 @@ pub async fn submit_invoice(
 }
 async fn save_invoice(
     pool: &PgPool,
-    invoice: models::invoice_model::Invoice,
+    invoice: &models::invoice_model::Invoice,
     raw_xml: &str,
 ) -> Result<(), sqlx::Error> {
     // helper: we'll use .as_deref() and .as_ref() inline to borrow inner strings
 
     // insert supplier party (no transaction for now)
-    let supplier_party_id: Option<i64> = if let Some(sup_wrap) = invoice.accounting_supplier_party {
-        let p = sup_wrap.party;
+    let supplier_party_id: Option<i64> = if let Some(sup_wrap) = &invoice.accounting_supplier_party {
+        let p = &sup_wrap.party;
         let row = sqlx::query("INSERT INTO parties (name, company_id, telephone, email) VALUES ($1,$2,$3,$4) RETURNING id")
             .bind(p.name.as_deref())
             .bind(p.party_tax_scheme.as_ref().and_then(|pts| pts.company_id.as_deref()))
@@ -89,9 +100,9 @@ async fn save_invoice(
     };
 
     // insert customer party
-    let customer_party_id: Option<i64> = if let Some(cust_wrap) = invoice.accounting_customer_party
+    let customer_party_id: Option<i64> = if let Some(cust_wrap) = &invoice.accounting_customer_party
     {
-        let p = cust_wrap.party;
+        let p = &cust_wrap.party;
         let row = sqlx::query("INSERT INTO parties (name, company_id, telephone, email) VALUES ($1,$2,$3,$4) RETURNING id")
             .bind(p.name.as_deref())
             .bind(p.party_tax_scheme.as_ref().and_then(|pts| pts.company_id.as_deref()))
@@ -105,7 +116,7 @@ async fn save_invoice(
     };
 
     // invoice-level monetary fields
-    let (tax_total_amount, tax_total_currency) = if let Some(tt) = invoice.tax_total {
+    let (tax_total_amount, tax_total_currency) = if let Some(tt) = &invoice.tax_total {
         (
             tt.tax_amount.as_ref().and_then(|a| a.value.clone()),
             tt.tax_amount.as_ref().and_then(|a| a.currency_id.clone()),
@@ -164,9 +175,9 @@ async fn save_invoice(
     .await?;
 
     // insert invoice lines
-    if let Some(lines) = invoice.invoice_lines {
+    if let Some(lines) = &invoice.invoice_lines {
         for line in lines {
-            let line_id = line.id;
+            let line_id = &line.id;
             let quantity = line
                 .invoiced_quantity
                 .as_ref()
