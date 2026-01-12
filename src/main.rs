@@ -1,4 +1,4 @@
-use crate::routes::enroll::enroll;
+use crate::routes::{enroll::enroll, on_boarding::on_board};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
@@ -91,6 +91,7 @@ async fn main() -> std::io::Result<()> {
             .route("/health_check", web::get().to(health_check))
             .route("/submit_invoice", web::post().to(submit_invoice))
             .route("/enroll", web::post().to(enroll))
+            .route("/onboard", web::get().to(on_board))
     })
     .bind(("0.0.0.0", port))?
     .run()

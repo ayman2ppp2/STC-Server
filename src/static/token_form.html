@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STC Token Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .error { color: red; margin-top: 10px; }
+        .success { color: green; margin-top: 10px; }
+        .token-display { background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin-top: 15px; word-break: break-all; }
+        .loading { display: none; }
+    </style>
+</head>
+<body>
+    <h1>STC Token Generator</h1>
+    <p>Fill out the form below to generate your unique token.</p>
+
+    <form id="tokenForm">
+        <div class="form-group">
+            <label for="name">Name *</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email *</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+
+        <div class="form-group">
+            <label for="company">Company</label>
+            <input type="text" id="company" name="company">
+        </div>
+
+        <button type="submit">Generate Token</button>
+
+        <div class="loading">Generating token...</div>
+        <div id="result"></div>
+    </form>
+    <script>
+        document.getElementById('tokenForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const loading = document.querySelector('.loading');
+            const result = document.getElementById('result');
+            const submitBtn = document.querySelector('button[type="submit"]');
+
+            // Show loading state
+            loading.style.display = 'block';
+            result.innerHTML = '';
+            submitBtn.disabled = true;
+
+            // Get form data
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                company: document.getElementById('company').value
+            };
+
+            try {
+                const response = await fetch('/onboard', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">${data.message}</div>
+                        <div class="token-display">
+                            <strong>Your Token:</strong><br>
+                            <code>${data.token}</code><br>
+                            <button onclick="copyToken('${data.token}')" style="margin-top: 10px;">Copy Token</button>
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">Error: ${data.error} - ${data.details}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+            } finally {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+
+        function copyToken(token) {
+            navigator.clipboard.writeText(token).then(() => {
+                alert('Token copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy token:', err);
+            });
+        }
+    </script>
+</body>
+</html>
