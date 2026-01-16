@@ -19,9 +19,9 @@ pub async fn submit_invoice(
         .parse()
         .map_err(actix_web::error::ErrorBadRequest)?;
     // parse invoice
-    intermidate_DTO
-        .parse_invoice()
-        .map_err(actix_web::error::ErrorBadRequest)?;
+    // intermidate_DTO
+    //     .parse_invoice()
+    //     .map_err(actix_web::error::ErrorBadRequest)?;
     // calculate hash
     let received_hash = &intermidate_DTO.invoice_hash;
     let hash = intermidate_DTO
@@ -32,9 +32,9 @@ pub async fn submit_invoice(
         return Err(actix_web::error::ErrorNotAcceptable("hash mismatch"));
     }
     // verify the certificate
-    verify_cert_with_ca(&crypto.get_ref().certificate, &intermidate_DTO.certificate)
-        .await
-        .map_err(actix_web::error::ErrorBadRequest)?;
+    // verify_cert_with_ca(&crypto.get_ref().certificate, &intermidate_DTO.certificate)
+    //     .await
+    //     .map_err(actix_web::error::ErrorBadRequest)?;
     // verify signature
     verify_signature_with_cert(
         &intermidate_DTO.invoice_hash,
@@ -44,28 +44,28 @@ pub async fn submit_invoice(
     .await
     .map_err(actix_web::error::ErrorBadRequest)?;
     // if valid save the invoice and return an OK ,else return the problem and descard the invoice
-    match intermidate_DTO.parse_invoice() {
-        Ok(invoice) => {
-            let raw_data = String::from_utf8(intermidate_DTO.invoice_bytes)
-                .expect("failed to convert the raw invoice bytes into a str");
-            match save_invoice(db_pool.get_ref(), &invoice, &raw_data).await {
-                Ok(_) => {
-                    println!("Saved invoice successfully");
-                    Ok(HttpResponse::Ok().body("the invoice is saved successfully"))
-                }
-                Err(e) => {
-                    eprintln!("DB error saving invoice: {}", e);
-                    Ok(HttpResponse::InternalServerError()
-                        .body(format!("Failed to save invoice: {}", e)))
-                }
-            }
-        }
-        Err(e) => {
-            Err(actix_web::error::ErrorBadRequest(e))
-        }
-    }
+    // match intermidate_DTO.parse_invoice() {
+    //     Ok(invoice) => {
+    //         let raw_data = String::from_utf8(intermidate_DTO.invoice_bytes)
+    //             .expect("failed to convert the raw invoice bytes into a str");
+    //         match save_invoice(db_pool.get_ref(), &invoice, &raw_data).await {
+    //             Ok(_) => {
+    //                 println!("Saved invoice successfully");
+    //                 Ok(HttpResponse::Ok().body("the invoice is saved successfully"))
+    //             }
+    //             Err(e) => {
+    //                 eprintln!("DB error saving invoice: {}", e);
+    //                 Ok(HttpResponse::InternalServerError()
+    //                     .body(format!("Failed to save invoice: {}", e)))
+    //             }
+    //         }
+    //     }
+    //     Err(e) => {
+    //         Err(actix_web::error::ErrorBadRequest(e))
+    //     }
+    // }
 
-    // Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().body("good to go"))
     // match quick_xml::de::from_str::<invoice_model::Invoice>(&body) {
     //     Ok(invoice) => {
     //         // attempt to persist the invoice in Postgres
