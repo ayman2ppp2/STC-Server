@@ -6,13 +6,11 @@ WORKDIR /app
 # Install libraries required by SQLx to compile
 RUN apt-get update && \
     apt-get install -y \
-        pkg-config \
-        libssl-dev \
-        libpq-dev \
-        libxml2-dev \
-        clang \
-        libclang-dev && \
-    rm -rf /var/lib/apt/lists/*
+        ca-certificates \
+        libssl3 \
+        libpq5 \
+        libxml2 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Use nightly for edition 2024
 RUN rustup default nightly
