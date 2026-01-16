@@ -5,7 +5,11 @@ WORKDIR /app
 
 # Install libraries required by SQLx to compile
 RUN apt-get update && \
-    apt-get install -y pkg-config libssl-dev libpq-dev && \
+    apt-get install -y \
+        pkg-config \
+        libssl-dev \
+        libpq-dev \
+        libxml2-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Use nightly for edition 2024
