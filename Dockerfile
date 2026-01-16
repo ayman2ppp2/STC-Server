@@ -9,7 +9,9 @@ RUN apt-get update && \
         pkg-config \
         libssl-dev \
         libpq-dev \
-        libxml2-dev && \
+        libxml2-dev \
+        clang \
+        libclang-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Use nightly for edition 2024
