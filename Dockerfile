@@ -66,6 +66,6 @@ ENV RUST_BACKTRACE=full
 
 # Run migrations but don't let a migration failure kill the container.
 # Then exec the server so it becomes PID 1 and receives signals properly.
-# CMD sh -c "sqlx migrate run || echo 'migrations skipped'; exec ./stc-server"
-CMD ["sh", "-c", "echo 'starting stc-server'; exec ./stc-server"]
+CMD sh -c "sqlx migrate run || echo 'migrations skipped'; exec ./stc-server"
+# CMD ["sh", "-c", "echo 'starting stc-server'; exec ./stc-server"]
 
