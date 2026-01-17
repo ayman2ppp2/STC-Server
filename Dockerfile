@@ -3,20 +3,28 @@ FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
-# Install libraries required by SQLx to compile
+# Install libraries required by SQLx and XML/Crypto builds
 RUN apt-get update && \
-    apt-get install -y \ pkg-config \libssl-dev \libpq-dev \ clang \
-    llvm \ ca-certificates \ libxml2-dev \
-    libclang-dev && \
+    apt-get install -y \
+        pkg-config \
+        libssl-dev \
+        libpq-dev \
+        clang \
+        llvm \
+        ca-certificates \
+        libxml2-dev \
+        libclang-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Use nightly for edition 2024
+# Use stable (edition 2024 is already supported on stable)
 RUN rustup default stable
 
-# Install SQLX CLI
-RUN cargo install --version="~0.7" sqlx-cli --no-default-features --features rustls,postgres
+# Install SQLx CLI
+RUN cargo install --version="~0.7" sqlx-cli \
+    --no-default-features \
+    --features rustls,postgres
 
-# Copy cargo files for caching
+# Copy cargo files for dependency caching
 COPY Cargo.toml Cargo.lock ./
 
 # Pre-build dependencies
@@ -36,16 +44,19 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install SSL and postgres runtime libs
+# Install runtime dependencies (keep all requested packages)
 RUN apt-get update && \
-    apt-get install -y ca-certificates libssl-dev libpq5 \ca-certificates \
+    apt-get install -y \
+        ca-certificates \
+        libssl-dev \
+        libpq5 \
         wget && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy compiled server
+# Copy compiled server binary
 COPY --from=builder /app/target/release/stc-server /app/stc-server
 
-# Copy SQLX CLI (glibc-compatible now)
+# Copy SQLx CLI (glibc-compatible)
 COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
 
 # Copy migrations
