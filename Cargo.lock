@@ -1940,7 +1940,6 @@ dependencies = [
  "actix-web",
  "base64",
  "hex",
- "libxml",
  "openssl",
  "quick-xml",
  "serde",

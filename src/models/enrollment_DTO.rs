@@ -20,7 +20,7 @@ impl EnrollDTO {
         // let certificate_bytes = general_purpose::STANDARD.decode(& self.csr).map_err(|_|
         //   "the certificate request is not valid base64"
         // )?;
-        
+
         let csr = X509Req::from_pem(self.csr.as_bytes())
             .map_err(|e| format!("Failed to parse the certificate request : {}", e))?;
         Ok(IntermediateEnrollDto { csr })

@@ -85,7 +85,8 @@ async fn save_invoice(
     // helper: we'll use .as_deref() and .as_ref() inline to borrow inner strings
 
     // insert supplier party (no transaction for now)
-    let supplier_party_id: Option<i64> = if let Some(sup_wrap) = &invoice.accounting_supplier_party {
+    let supplier_party_id: Option<i64> = if let Some(sup_wrap) = &invoice.accounting_supplier_party
+    {
         let p = &sup_wrap.party;
         let row = sqlx::query("INSERT INTO parties (name, company_id, telephone, email) VALUES ($1,$2,$3,$4) RETURNING id")
             .bind(p.name.as_deref())

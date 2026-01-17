@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow,Decode};
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+use sqlx::{Decode, FromRow};
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 #[serde(rename = "Invoice")]
 pub struct Invoice {
     #[serde(rename = "ID")]
@@ -31,13 +31,13 @@ pub struct Invoice {
     pub legal_monetary_total: Option<LegalMonetaryTotal>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct PartyWrapper {
     #[serde(rename = "Party")]
     pub party: Party,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct Party {
     #[serde(rename = "Name")]
     pub name: Option<String>,
@@ -52,7 +52,7 @@ pub struct Party {
     pub contact: Option<Contact>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct PostalAddress {
     #[serde(rename = "StreetName")]
     pub street_name: Option<String>,
@@ -70,7 +70,7 @@ pub struct Country {
     pub identification_code: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct PartyTaxScheme {
     #[serde(rename = "CompanyID")]
     pub company_id: Option<String>,
@@ -79,13 +79,13 @@ pub struct PartyTaxScheme {
     pub tax_scheme: Option<TaxScheme>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct TaxScheme {
     #[serde(rename = "ID")]
     pub id: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct Contact {
     #[serde(rename = "Telephone")]
     pub telephone: Option<String>,
@@ -94,7 +94,7 @@ pub struct Contact {
     pub electronic_mail: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct InvoiceLine {
     #[serde(rename = "ID")]
     pub id: Option<String>,
@@ -115,7 +115,7 @@ pub struct InvoiceLine {
     pub tax_total: Option<TaxTotal>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct Quantity {
     #[serde(rename = "@unitCode")]
     pub unit_code: Option<String>,
@@ -124,7 +124,7 @@ pub struct Quantity {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct Amount {
     #[serde(rename = "@currencyID")]
     pub currency_id: Option<String>,
@@ -133,7 +133,7 @@ pub struct Amount {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct Item {
     #[serde(rename = "Name")]
     pub name: Option<String>,
@@ -142,13 +142,13 @@ pub struct Item {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct Price {
     #[serde(rename = "PriceAmount")]
     pub price_amount: Option<Amount>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct TaxTotal {
     #[serde(rename = "TaxAmount")]
     pub tax_amount: Option<Amount>,
@@ -157,7 +157,7 @@ pub struct TaxTotal {
     pub tax_subtotal: Option<TaxSubtotal>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct TaxSubtotal {
     #[serde(rename = "TaxableAmount")]
     pub taxable_amount: Option<Amount>,
@@ -169,7 +169,7 @@ pub struct TaxSubtotal {
     pub tax_category: Option<TaxCategory>,
 }
 
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct TaxCategory {
     #[serde(rename = "Percent")]
     pub percent: Option<String>,
@@ -180,7 +180,7 @@ pub struct TaxCategory {
 
 /// ⚠ If using quick-xml, namespace prefixes like "cbc:" may break.
 /// Consider removing "cbc:" in the rename fields.
-#[derive(Debug, Deserialize, Serialize,FromRow)]
+#[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct LegalMonetaryTotal {
     #[serde(rename = "cbc:LineExtensionAmount")]
     pub line_extension_amount: Option<Amount>,

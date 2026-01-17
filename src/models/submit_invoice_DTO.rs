@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::u8;
 
 use base64::Engine;
@@ -6,9 +5,9 @@ use base64::engine::general_purpose;
 use openssl::hash::{MessageDigest, hash};
 use openssl::pkey::{PKey, Public};
 use openssl::x509::X509;
-use quick_xml::Reader;
 use quick_xml::de::from_str;
 use quick_xml::events::Event;
+use quick_xml::{Reader, Writer};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use xml_c14n::{CanonicalizationMode, CanonicalizationOptions, canonicalize_xml};
@@ -80,58 +79,138 @@ impl IntermediateInvoiceDto {
     }
 }
 
-use libxml::parser::Parser;
-use libxml::xpath::Context;
-
 pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
-    /* -------------------------------------------------
-     * 1. Parse raw XML
-     * ------------------------------------------------- */
-    let xml_str = std::str::from_utf8(raw_xml).map_err(|e| format!("invalid UTF-8 XML: {}", e))?;
+    let mut reader = Reader::from_reader(raw_xml);
+    let mut writer = Writer::new(Vec::new());
+    let mut buf = Vec::new();
 
-    let parser = Parser::default();
-    let mut doc = parser
-        .parse_string(xml_str)
-        .map_err(|e| format!("XML parse error: {}", e))?;
+    let mut skip_depth: usize = 0;
 
-    /* -------------------------------------------------
-     * 2. Remove ZATCA-excluded nodes (XPath)
-     * ------------------------------------------------- */
-    let mut ctx = Context::new(&doc).map_err(|e| format!("XPath context error: {:?}", e))?;
+    let mut adr_depth: usize = 0;
+    let mut adr_has_qr = false;
+    let mut adr_writer = Writer::new(Vec::new());
 
-    let xpaths = [
-        "//*[local-name()='Invoice']//*[local-name()='UBLExtensions']",
-        "//*[local-name()='Invoice']//*[local-name()='Signature']",
-        "//*[local-name()='AdditionalDocumentReference']
-          [*[local-name()='ID' and normalize-space(text())='QR']]",
-    ];
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = std::str::from_utf8(e.name().into_inner())
+                    .map_err(|e| e.to_string())?
+                    .rsplit(':')
+                    .next()
+                    .unwrap();
 
-    for xp in xpaths {
-        let nodes = ctx
-            .evaluate(xp)
-            .map_err(|e| format!("XPath eval error: {:?}", e))?;
+                if skip_depth > 0 {
+                    skip_depth += 1;
+                } else if name == "UBLExtensions" || name == "Signature" {
+                    skip_depth = 1;
+                } else if name == "AdditionalDocumentReference" {
+                    adr_depth = 1;
+                    adr_has_qr = false;
+                    adr_writer
+                        .write_event(Event::Start(e.clone()))
+                        .map_err(|e| e.to_string())?;
+                } else if adr_depth > 0 {
+                    adr_depth += 1;
+                    adr_writer
+                        .write_event(Event::Start(e.clone()))
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    writer
+                        .write_event(Event::Start(e.to_owned()))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
 
-        for mut node in nodes.get_nodes_as_vec() {
-            node.unlink();
+            Ok(Event::End(e)) => {
+                if skip_depth > 0 {
+                    skip_depth -= 1;
+                } else if adr_depth > 0 {
+                    adr_depth -= 1;
+                    adr_writer
+                        .write_event(Event::End(e.clone()))
+                        .map_err(|e| e.to_string())?;
+
+                    if adr_depth == 0 && !adr_has_qr {
+                        let adr_bytes = adr_writer.into_inner();
+                        let mut adr_reader = Reader::from_reader(adr_bytes.as_slice());
+                        let mut adr_buf = Vec::new();
+                        loop {
+                            match adr_reader.read_event_into(&mut adr_buf) {
+                                Ok(Event::Eof) => break,
+                                Ok(ev) => writer.write_event(ev).map_err(|e| e.to_string())?,
+                                Err(e) => return Err(format!("ADR XML error: {}", e)),
+                            }
+                            adr_buf.clear();
+                        }
+                        adr_writer = Writer::new(Vec::new());
+                    }
+                } else {
+                    writer
+                        .write_event(Event::End(e.to_owned()))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                let text = std::str::from_utf8(e.as_ref())
+                    .map_err(|e| e.to_string())?
+                    .trim();
+
+                if adr_depth > 0 && text == "QR" {
+                    adr_has_qr = true;
+                }
+
+                if skip_depth == 0 {
+                    if adr_depth > 0 {
+                        adr_writer
+                            .write_event(Event::Text(e.clone()))
+                            .map_err(|e| e.to_string())?;
+                    } else {
+                        writer
+                            .write_event(Event::Text(e.to_owned()))
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+
+            Ok(Event::Eof) => break,
+
+            Ok(ev) => {
+                if skip_depth == 0 {
+                    if adr_depth > 0 {
+                        adr_writer
+                            .write_event(ev.clone())
+                            .map_err(|e| e.to_string())?;
+                    } else {
+                        writer
+                            .write_event(ev.to_owned())
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+
+            Err(e) => return Err(format!("XML parse error: {}", e)),
         }
+
+        buf.clear();
     }
 
-    /* -------------------------------------------------
-     * 3. Serialize WITHOUT XML declaration
-     * ------------------------------------------------- */
-    let cleaned_xml = doc.to_string(); // libxml omits XML declaration
 
-    /* -------------------------------------------------
-     * 4. Canonicalize (C14N 1.1 – ZATCA requirement)
-     * ------------------------------------------------- */
+    let cleaned_xml = writer.into_inner();
+
+    /* -------------------------
+     * Canonicalization (unchanged)
+     * ------------------------- */
     let options = CanonicalizationOptions {
         mode: CanonicalizationMode::Canonical1_1,
         keep_comments: false,
         inclusive_ns_prefixes: vec![],
     };
 
-    let canonical = canonicalize_xml(&cleaned_xml, options)
-        .map_err(|e| format!("canonicalization error: {}", e))?;
+    let canonical = canonicalize_xml(
+        std::str::from_utf8(&cleaned_xml).map_err(|e| e.to_string())?,
+        options,
+    ).map_err(|e| e.to_string())?;
 
     Ok(canonical.into_bytes())
 }
