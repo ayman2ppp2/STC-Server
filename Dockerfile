@@ -10,6 +10,7 @@ RUN apt-get update && \
         libssl-dev \
         libpq-dev \
         ca-certificates \
+        libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
 # Optimize for faster builds
 ENV CARGO_NET_RETRY=10
@@ -46,6 +47,7 @@ RUN apt-get update && \
         libssl3 \
         libpq5 \
         ca-certificates \
+
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only what's needed for runtime
