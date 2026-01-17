@@ -7,11 +7,15 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         pkg-config \
+        clang \
+        llvm-20 \
         libssl-dev \
         libpq-dev \
         ca-certificates \
         libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
+
+ENV LIBCLANG_PATH=/usr/lib/llvm-20/lib
 # Optimize for faster builds
 ENV CARGO_NET_RETRY=10
 ENV CARGO_JOBS=4
@@ -47,7 +51,7 @@ RUN apt-get update && \
         libssl3 \
         libpq5 \
         ca-certificates \
-
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only what's needed for runtime
