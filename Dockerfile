@@ -1,5 +1,5 @@
 ########## 1. Builder Stage ##########
-FROM rust:1.83-bookworm AS builder
+FROM rust:nightly-bookworm AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ ENV CARGO_NET_RETRY=10
 ENV CARGO_JOBS=4
 
 # Install SQLX CLI for migrations (cached separately)
-RUN cargo install sqlx-cli --no-default-features --features rustls,postgres
+RUN cargo install sqlx-cli@0.8.6 --no-default-features --features rustls,postgres
 
 # Create dummy main.rs for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
