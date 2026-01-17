@@ -1,3 +1,5 @@
+[profile.release]
+panic = "unwind"
 [package]
 name = "stc-server"
 version = "0.1.0"
