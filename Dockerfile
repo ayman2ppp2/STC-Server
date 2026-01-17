@@ -3,32 +3,20 @@ FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
-# Install build-time libraries required by bindgen/sqlx/libxml
 RUN apt-get update && \
     apt-get install -y \
         pkg-config \
         clang \
-        libclang-dev \
+        llvm-14 \
+        libclang-14-dev \
         libssl-dev \
         libpq-dev \
         libxml2-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Make libclang discoverable for bindgen (symlink first found libclang to /usr/lib/libclang.so)
-RUN set -eux; \
-    src="$(find /usr -type f -name 'libclang.so*' 2>/dev/null | head -n1 || true)"; \
-    if [ -n "$src" ]; then \
-      ln -sf "$src" /usr/lib/libclang.so; \
-      ldconfig || true; \
-    else \
-      echo "ERROR: libclang.so not found; listing /usr for debug:"; \
-      find /usr -maxdepth 4 -name 'libclang*' -print || true; \
-      false; \
-    fi
-ENV LIBCLANG_PATH=/usr/lib
+ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
 
-# Use nightly for edition 2024
 RUN rustup default nightly
 
 # Install SQLX CLI (if you need it in the builder stage)
