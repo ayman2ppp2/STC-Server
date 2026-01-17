@@ -3,18 +3,14 @@ FROM rust:1.92-bookworm AS builder
 
 WORKDIR /app
 
-# Install system dependencies in one layer
+# Install build dependencies for OpenSSL and PostgreSQL
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         pkg-config \
-        clang \
-        llvm-20 \
         libssl-dev \
         libpq-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-ENV LIBCLANG_PATH=/usr/lib/llvm-20/lib
 # Optimize for faster builds
 ENV CARGO_NET_RETRY=10
 ENV CARGO_JOBS=4
@@ -44,12 +40,12 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install only runtime libraries in one layer
+# Install essential runtime libraries
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
         libssl3 \
         libpq5 \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only what's needed for runtime
@@ -65,9 +61,9 @@ EXPOSE 8080
 
 ENV RUST_BACKTRACE=1
 
-# Health check for Render
+# Health check for Render (uses built-in health endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8080}/health_check || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health_check || exit 1
 
 # Run migrations then start server
 CMD sh -c "sqlx migrate run --database-url $DATABASE_URL && exec ./stc-server"
