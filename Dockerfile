@@ -13,9 +13,10 @@ RUN apt-get update && \
         libpq-dev \
         ca-certificates \
         libxml2-dev \
+        libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV LIBCLANG_PATH=/usr/lib/llvm-20/lib
+ENV LIBCLANG_PATH=/usr/lib/x86_64-linux-gnu
 # Optimize for faster builds
 ENV CARGO_NET_RETRY=10
 ENV CARGO_JOBS=4
