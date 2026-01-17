@@ -1,5 +1,5 @@
 ########## 1. Builder Stage ##########
-FROM rust:nightly-bookworm AS builder
+FROM rust:1.92-bookworm AS builder
 
 WORKDIR /app
 
@@ -8,13 +8,13 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         pkg-config \
         clang \
-        llvm-19 \
+        llvm-20 \
         libssl-dev \
         libpq-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ENV LIBCLANG_PATH=/usr/lib/llvm-19/lib
+ENV LIBCLANG_PATH=/usr/lib/llvm-20/lib
 # Optimize for faster builds
 ENV CARGO_NET_RETRY=10
 ENV CARGO_JOBS=4
