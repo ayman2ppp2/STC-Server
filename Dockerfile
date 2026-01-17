@@ -1,39 +1,41 @@
 ########## 1. Builder Stage ##########
-FROM rust:1-bookworm AS builder
+FROM rust:1.83-bookworm AS builder
 
 WORKDIR /app
 
+# Install system dependencies in one layer
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
         pkg-config \
         clang \
-        llvm-14 \
-        libclang-14-dev \
+        llvm-19 \
         libssl-dev \
         libpq-dev \
-        libxml2-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
+ENV LIBCLANG_PATH=/usr/lib/llvm-19/lib
+# Optimize for faster builds
+ENV CARGO_NET_RETRY=10
+ENV CARGO_JOBS=4
 
-RUN rustup default nightly
+# Install SQLX CLI for migrations (cached separately)
+RUN cargo install sqlx-cli --no-default-features --features rustls,postgres
 
-# Install SQLX CLI (if you need it in the builder stage)
-RUN cargo install --version="~0.7" sqlx-cli --no-default-features --features rustls,postgres
-
-# Copy cargo files for caching
-COPY Cargo.toml Cargo.lock ./
-
-# Pre-build dependencies (small main placeholder)
+# Create dummy main.rs for dependency caching
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-RUN rm -rf src
 
-# Copy full project
-COPY . .
+# Copy cargo files for dependency caching
+COPY Cargo.toml ./
 
-# Build final binary (release)
+# Build dependencies (cached until Cargo.toml changes)
+RUN cargo build --release && rm -rf src
+
+# Copy source code (this layer invalidates when source changes)
+COPY src ./src
+COPY migrations ./migrations
+
+# Build final binary
 RUN cargo build --release
 
 
@@ -42,30 +44,32 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install only runtime libraries
+# Install only runtime libraries in one layer
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
         ca-certificates \
         libssl3 \
         libpq5 \
-        libxml2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy compiled server binary from builder
+# Copy only what's needed for runtime
+COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
+COPY --from=builder /app/migrations /app/migrations
 COPY --from=builder /app/target/release/stc-server /app/stc-server
 
-# Copy SQLX CLI (optional)
-COPY --from=builder /usr/local/cargo/bin/sqlx /usr/local/bin/sqlx
-
-# Copy migrations
-COPY --from=builder /app/migrations /app/migrations
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8080
 
-ENV RUST_BACKTRACE=full
+ENV RUST_BACKTRACE=1
 
-# Run migrations but don't let a migration failure kill the container.
-# Then exec the server so it becomes PID 1 and receives signals properly.
-CMD sh -c "sqlx migrate run || echo 'migrations skipped'; exec ./stc-server"
+# Health check for Render
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/health_check || exit 1
+
+# Run migrations then start server
+CMD sh -c "sqlx migrate run --database-url $DATABASE_URL && exec ./stc-server"
 # CMD ["sh", "-c", "echo 'starting stc-server'; exec ./stc-server"]
 
