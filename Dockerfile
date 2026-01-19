@@ -15,6 +15,9 @@ RUN apt-get update && \
         libclang-dev && \
     rm -rf /var/lib/apt/lists/*
 
+# Set LIBCLANG_PATH for bindgen
+ENV LIBCLANG_PATH=/usr/lib/llvm-15/lib
+
 # Use stable (edition 2024 is already supported on stable)
 RUN rustup default stable
 
