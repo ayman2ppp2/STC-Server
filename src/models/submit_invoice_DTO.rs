@@ -240,25 +240,8 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
     }
 
     let cleaned_xml = writer.into_inner();
-    dbg!(String::from_utf8_lossy(&cleaned_xml));
 
-    // /* ---------- C14N ---------- */
-    // let xml_str = std::str::from_utf8(&cleaned_xml).map_err(|e| e.to_string())?;
-    // let mut result = Vec::new();
 
-    // Canonicalizer::read_from_str(xml_str)
-    //     .write_to_writer(Cursor::new(&mut result))
-    //     .canonicalize(false)
-    //     .map_err(|e| e.to_string())?;
-    // dbg!(String::from_utf8_lossy(&result));
-
-    // Add debug print statements for both outputs
-    // let xml_canonicalization_output = String::from_utf8_lossy(&result);
-    // dbg!("xml-canonicalization output:", &xml_canonicalization_output);
-
-    // // If using xml-c14n, add similar debug print
-    // let xml_c14n_output = String::from_utf8_lossy(&cleaned_xml); // Replace with actual xml-c14n output if available
-    // dbg!("xml-c14n output:", &xml_c14n_output);
 
     let options = CanonicalizationOptions {
         mode: CanonicalizationMode::Canonical1_1,
@@ -269,7 +252,7 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
         std::str::from_utf8(&cleaned_xml).map_err(|e| e.to_string())?,
         options,
     ).map_err(|e| e.to_string())?;
-    dbg!(&canonical);
+    
     Ok(canonical.into_bytes())
 
     // Ok(result)
