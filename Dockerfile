@@ -37,8 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
 
 # Copy the compiled binary from the builder stage.
-COPY --from=builder /usr/src/app/target/release/myapp /app/myapp
+COPY --from=builder /usr/src/app/target/release /app/myapp
 
 # Expose port and set the default command (Render will route $PORT to this).
 EXPOSE $PORT
-CMD ["./myapp"]
+CMD ["./stc-server"]
