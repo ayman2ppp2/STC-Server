@@ -12,11 +12,12 @@ RUN apt-get update && \
         ca-certificates \
         libxml2-dev \
         clang \
-        libclang-dev && \
-    rm -rf /var/lib/apt/lists/*
+        llvm-dev \
+        libclang-dev \
+        && rm -rf /var/lib/apt/lists/*
 
 # Set LIBCLANG_PATH for bindgen
-ENV LIBCLANG_PATH=/usr/lib/llvm-15/lib
+ENV LIBCLANG_PATH=/usr/lib/llvm-*/lib
 
 # Use stable (edition 2024 is already supported on stable)
 RUN rustup default stable
