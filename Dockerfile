@@ -10,8 +10,7 @@ RUN apt-get update && \
         libssl-dev \
         libpq-dev \
         ca-certificates \
-        libxml2-dev \
-
+        libxml2-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Use stable (edition 2024 is already supported on stable)
@@ -64,4 +63,4 @@ COPY --from=builder /app/migrations /app/migrations
 ENV PORT=8080
 EXPOSE 8080
 
-CMD sh -c "sqlx migrate run && ./stc-server"
+CMD ["sh", "-c", "sqlx migrate run && ./stc-server"]
