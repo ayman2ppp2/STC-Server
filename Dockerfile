@@ -3,14 +3,16 @@ FROM rust:1-bookworm AS builder
 
 WORKDIR /app
 
-# Install libraries required by SQLx and XML/Crypto builds
+# Install libraries required by SQLx, XML/Crypto builds, and bindgen
 RUN apt-get update && \
     apt-get install -y \
         pkg-config \
         libssl-dev \
         libpq-dev \
         ca-certificates \
-        libxml2-dev && \
+        libxml2-dev \
+        clang \
+        libclang-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Use stable (edition 2024 is already supported on stable)
