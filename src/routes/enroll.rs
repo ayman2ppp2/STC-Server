@@ -1,9 +1,8 @@
-use crate::services::pki_service::x509_to_base64;
 use actix_web::{HttpResponse, web};
 
 use crate::{
     config::crypto_config::Crypto,
-    models::enrollment_DTO::{EnrollDTO, EnrollResponse},
+    models::enrollment_dto::{EnrollDTO, EnrollResponse},
     services::pki_service::handle_enrollment,
 };
 

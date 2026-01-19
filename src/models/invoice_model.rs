@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Decode, FromRow};
+use sqlx::FromRow;
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 #[serde(rename = "Invoice")]
 pub struct Invoice {

@@ -1,4 +1,3 @@
-use base64::{Engine, engine::general_purpose};
 use openssl::x509::X509Req;
 #[derive(serde::Deserialize)]
 pub struct EnrollDTO {

@@ -1,4 +1,3 @@
-use std::u8;
 
 use base64::Engine;
 use base64::engine::general_purpose;
@@ -12,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use xml_c14n::{CanonicalizationMode, CanonicalizationOptions, canonicalize_xml};
 use std::io::Cursor;
-use xml_canonicalization::Canonicalizer;
 
 use crate::models::invoice_model::Invoice;
 #[derive(Debug, Deserialize, Serialize, FromRow)]
@@ -76,7 +74,6 @@ impl IntermediateInvoiceDto {
     }
     pub fn compute_hash(&self) -> Result<Vec<u8>, openssl::error::ErrorStack> {
         let digest = hash(MessageDigest::sha256(), &self.invoice_bytes)?;
-        print!("{:?}", digest);
         Ok(digest.to_vec())
     }
 }
@@ -252,7 +249,7 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
         std::str::from_utf8(&cleaned_xml).map_err(|e| e.to_string())?,
         options,
     ).map_err(|e| e.to_string())?;
-    
+
     Ok(canonical.into_bytes())
 
     // Ok(result)

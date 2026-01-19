@@ -5,16 +5,20 @@ use sqlx::{PgPool, Row};
 
 use crate::{
     config::crypto_config::Crypto,
-    models::{self, submit_invoice_DTO::SubmitInvoiceDto},
-    services::pki_service::{verify_cert_with_ca, verify_signature_with_cert},
+    models::{
+        self,
+        submit_invoice_dto::SubmitInvoiceDto,
+        submit_invoice_response_dto::{ClearenceStatus, MessageType, SubmitInvoiceResponse, ValidationMessage, ValidationResults, ValidationStatus},
+    },
+    services::pki_service::verify_signature_with_cert,
 };
 
 pub async fn submit_invoice(
     db_pool: web::Data<PgPool>,
-    invoice_DTO: web::Json<SubmitInvoiceDto>,
+    invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let intermidate_DTO = invoice_DTO
+    let intermidate_dto = invoice_dto
         .into_inner()
         .parse()
         .map_err(actix_web::error::ErrorBadRequest)?;
@@ -23,8 +27,8 @@ pub async fn submit_invoice(
     //     .parse_invoice()
     //     .map_err(actix_web::error::ErrorBadRequest)?;
     // calculate hash
-    let received_hash = &intermidate_DTO.invoice_hash;
-    let hash = intermidate_DTO
+    let received_hash = &intermidate_dto.invoice_hash;
+    let hash = intermidate_dto
         .compute_hash()
         .map_err(actix_web::error::ErrorBadRequest)?;
     // verify hash
@@ -37,9 +41,9 @@ pub async fn submit_invoice(
     //     .map_err(actix_web::error::ErrorBadRequest)?;
     // verify signature
     verify_signature_with_cert(
-        &intermidate_DTO.invoice_hash,
-        &intermidate_DTO.invoice_signature,
-        &intermidate_DTO.certificate,
+        &intermidate_dto.invoice_hash,
+        &intermidate_dto.invoice_signature,
+        &intermidate_dto.certificate,
     )
     .await
     .map_err(actix_web::error::ErrorBadRequest)?;
@@ -65,7 +69,25 @@ pub async fn submit_invoice(
     //     }
     // }
 
-    Ok(HttpResponse::Ok().body("good to go"))
+    Ok(HttpResponse::Ok().json(SubmitInvoiceResponse {
+        clearence_status: ClearenceStatus::Cleared,
+        cleared_invoice: "blablabla".to_string(),
+        validation_results: ValidationResults {
+            info_messages:vec![
+                ValidationMessage{
+                    message_type: MessageType::Info,
+                    code: "200".to_string(),
+                    category: "XSD validation".to_string(),
+                    message: "Complied with UBL 2.1 standards in line with STC specifications".to_string(),
+                    status: ValidationStatus::Pass,
+                }
+            ]
+            ,
+            warning_messages: vec![],
+            error_messages: vec![],
+            validation_status: ValidationStatus::Pass,
+        },
+    }))
     // match quick_xml::de::from_str::<invoice_model::Invoice>(&body) {
     //     Ok(invoice) => {
     //         // attempt to persist the invoice in Postgres

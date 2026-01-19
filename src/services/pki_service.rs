@@ -1,11 +1,10 @@
-use std::fmt::format;
 
 use crate::services::signer::sign;
 use base64::Engine;
 use base64::engine::general_purpose;
-use openssl::{asn1::Asn1Time, hash::MessageDigest, pkey::PKey, sign::Verifier, x509::X509};
+use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
 
-use crate::{config::crypto_config::Crypto, models::enrollment_DTO::EnrollDTO};
+use crate::{config::crypto_config::Crypto, models::enrollment_dto::EnrollDTO};
 
 pub async fn handle_enrollment(dto: &EnrollDTO, crypto: &Crypto) -> Result<String, String> {
     let intermediate = dto.parse().await?;
