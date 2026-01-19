@@ -11,6 +11,8 @@ use quick_xml::{Reader, Writer};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use xml_c14n::{CanonicalizationMode, CanonicalizationOptions, canonicalize_xml};
+use std::io::Cursor;
+use xml_canonicalization::Canonicalizer;
 
 use crate::models::invoice_model::Invoice;
 #[derive(Debug, Deserialize, Serialize, FromRow)]
@@ -41,7 +43,7 @@ impl SubmitInvoiceDto {
         let invoice_bytes = canonicalize(&invoice_bytes)?;
         let invoice_hash = general_purpose::STANDARD
             .decode(self.invoice_hash)
-            .map_err(|_| "invalid invioce hash")?;
+            .map_err(|_| "invalid invoice hash")?;
         let invoice_signature = general_purpose::STANDARD
             .decode(signature)
             .map_err(|_| "invalid base64 signature")?;
@@ -80,24 +82,30 @@ impl IntermediateInvoiceDto {
 }
 
 pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
-    let mut reader = Reader::from_reader(raw_xml);
+    // Remove XML declaration if present
+    let raw_xml = if raw_xml.starts_with(b"<?xml") {
+        let start = raw_xml.iter().position(|&b| b == b'>').ok_or("Invalid XML header")? + 1;
+        &raw_xml[start..]
+    } else {
+        raw_xml
+    };
+
+    let mut reader = Reader::from_reader(Cursor::new(raw_xml));
     let mut writer = Writer::new(Vec::new());
     let mut buf = Vec::new();
 
-    let mut skip_depth: usize = 0;
+    let mut skip_depth = 0usize;
 
-    let mut adr_depth: usize = 0;
+    let mut adr_depth = 0usize;
     let mut adr_has_qr = false;
+    let mut in_adr_id = false;
     let mut adr_writer = Writer::new(Vec::new());
 
     loop {
         match reader.read_event_into(&mut buf) {
+            /* ---------- START ---------- */
             Ok(Event::Start(e)) => {
-                let name = std::str::from_utf8(e.name().into_inner())
-                    .map_err(|e| e.to_string())?
-                    .rsplit(':')
-                    .next()
-                    .unwrap();
+                let name = local_name(e.name().local_name().as_ref())?;
 
                 if skip_depth > 0 {
                     skip_depth += 1;
@@ -106,13 +114,18 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
                 } else if name == "AdditionalDocumentReference" {
                     adr_depth = 1;
                     adr_has_qr = false;
+                    in_adr_id = false;
+                    adr_writer = Writer::new(Vec::new());
                     adr_writer
-                        .write_event(Event::Start(e.clone()))
+                        .write_event(Event::Start(e.to_owned()))
                         .map_err(|e| e.to_string())?;
                 } else if adr_depth > 0 {
                     adr_depth += 1;
+                    if name == "ID" {
+                        in_adr_id = true;
+                    }
                     adr_writer
-                        .write_event(Event::Start(e.clone()))
+                        .write_event(Event::Start(e.to_owned()))
                         .map_err(|e| e.to_string())?;
                 } else {
                     writer
@@ -121,27 +134,37 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
                 }
             }
 
+            /* ---------- END ---------- */
             Ok(Event::End(e)) => {
+                let name = local_name(e.name().local_name().as_ref())?;
+
                 if skip_depth > 0 {
                     skip_depth -= 1;
                 } else if adr_depth > 0 {
+                    if name == "ID" {
+                        in_adr_id = false;
+                    }
+
                     adr_depth -= 1;
                     adr_writer
-                        .write_event(Event::End(e.clone()))
+                        .write_event(Event::End(e.to_owned()))
                         .map_err(|e| e.to_string())?;
 
                     if adr_depth == 0 && !adr_has_qr {
-                        let adr_bytes = adr_writer.into_inner();
-                        let mut adr_reader = Reader::from_reader(adr_bytes.as_slice());
-                        let mut adr_buf = Vec::new();
+                        let bytes = adr_writer.into_inner();
+                        let mut r = Reader::from_reader(Cursor::new(bytes));
+                        let mut b = Vec::new();
+
                         loop {
-                            match adr_reader.read_event_into(&mut adr_buf) {
+                            match r.read_event_into(&mut b) {
                                 Ok(Event::Eof) => break,
                                 Ok(ev) => writer.write_event(ev).map_err(|e| e.to_string())?,
-                                Err(e) => return Err(format!("ADR XML error: {}", e)),
+                                Err(e) => return Err(format!("ADR replay error: {}", e)),
                             }
-                            adr_buf.clear();
+                            b.clear();
                         }
+
+                        // Reinitialize adr_writer after consuming it
                         adr_writer = Writer::new(Vec::new());
                     }
                 } else {
@@ -151,19 +174,39 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
                 }
             }
 
+            /* ---------- EMPTY ---------- */
+            Ok(Event::Empty(e)) => {
+                let name = local_name(e.name().local_name().as_ref())?;
+
+                if skip_depth > 0 {
+                    // skip
+                } else if name == "UBLExtensions" || name == "Signature" {
+                    // skip
+                } else if adr_depth > 0 {
+                    adr_writer
+                        .write_event(Event::Empty(e.to_owned()))
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    writer
+                        .write_event(Event::Empty(e.to_owned()))
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+
+            /* ---------- TEXT ---------- */
             Ok(Event::Text(e)) => {
                 let text = std::str::from_utf8(e.as_ref())
                     .map_err(|e| e.to_string())?
                     .trim();
 
-                if adr_depth > 0 && text == "QR" {
+                if adr_depth > 0 && in_adr_id && text == "QR" {
                     adr_has_qr = true;
                 }
 
                 if skip_depth == 0 {
                     if adr_depth > 0 {
                         adr_writer
-                            .write_event(Event::Text(e.clone()))
+                            .write_event(Event::Text(e.to_owned()))
                             .map_err(|e| e.to_string())?;
                     } else {
                         writer
@@ -173,13 +216,14 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
                 }
             }
 
+            /* ---------- OTHER ---------- */
             Ok(Event::Eof) => break,
 
             Ok(ev) => {
                 if skip_depth == 0 {
                     if adr_depth > 0 {
                         adr_writer
-                            .write_event(ev.clone())
+                            .write_event(ev.to_owned())
                             .map_err(|e| e.to_string())?;
                     } else {
                         writer
@@ -195,26 +239,47 @@ pub fn canonicalize(raw_xml: &[u8]) -> Result<Vec<u8>, String> {
         buf.clear();
     }
 
-
     let cleaned_xml = writer.into_inner();
+    dbg!(String::from_utf8_lossy(&cleaned_xml));
 
-    /* -------------------------
-     * Canonicalization (unchanged)
-     * ------------------------- */
+    // /* ---------- C14N ---------- */
+    // let xml_str = std::str::from_utf8(&cleaned_xml).map_err(|e| e.to_string())?;
+    // let mut result = Vec::new();
+
+    // Canonicalizer::read_from_str(xml_str)
+    //     .write_to_writer(Cursor::new(&mut result))
+    //     .canonicalize(false)
+    //     .map_err(|e| e.to_string())?;
+    // dbg!(String::from_utf8_lossy(&result));
+
+    // Add debug print statements for both outputs
+    // let xml_canonicalization_output = String::from_utf8_lossy(&result);
+    // dbg!("xml-canonicalization output:", &xml_canonicalization_output);
+
+    // // If using xml-c14n, add similar debug print
+    // let xml_c14n_output = String::from_utf8_lossy(&cleaned_xml); // Replace with actual xml-c14n output if available
+    // dbg!("xml-c14n output:", &xml_c14n_output);
+
     let options = CanonicalizationOptions {
         mode: CanonicalizationMode::Canonical1_1,
         keep_comments: false,
         inclusive_ns_prefixes: vec![],
     };
-
-    let canonical = canonicalize_xml(
+ let canonical = canonicalize_xml(
         std::str::from_utf8(&cleaned_xml).map_err(|e| e.to_string())?,
         options,
     ).map_err(|e| e.to_string())?;
-
+    dbg!(&canonical);
     Ok(canonical.into_bytes())
+
+    // Ok(result)
 }
 
+/* ---------- helper ---------- */
+fn local_name(bytes: &[u8]) -> Result<String, String> {
+    let s = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
+    Ok(s.rsplit(':').next().unwrap().to_string())
+}
 fn extract_sig_crt(xml: &str) -> (String, String) {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);

@@ -9,11 +9,9 @@ RUN apt-get update && \
         pkg-config \
         libssl-dev \
         libpq-dev \
-        clang \
-        llvm \
         ca-certificates \
         libxml2-dev \
-        libclang-dev && \
+
     rm -rf /var/lib/apt/lists/*
 
 # Use stable (edition 2024 is already supported on stable)
@@ -50,6 +48,7 @@ RUN apt-get update && \
         ca-certificates \
         libssl-dev \
         libpq5 \
+        libxml2-dev \
         wget && \
     rm -rf /var/lib/apt/lists/*
 
