@@ -13,8 +13,8 @@ use crate::{
     services::pki_service::verify_signature_with_cert,
 };
 
-pub async fn submit_invoice(
-    db_pool: web::Data<PgPool>,
+pub async fn submit_invoice( 
+    db_pool: web::Data<PgPool>, 
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -102,7 +102,7 @@ pub async fn submit_invoice(
 async fn save_invoice(
     pool: &PgPool,
     invoice: &models::invoice_model::Invoice,
-    raw_xml: &str,
+    raw_xml: &str, 
 ) -> Result<(), sqlx::Error> {
     // helper: we'll use .as_deref() and .as_ref() inline to borrow inner strings
 

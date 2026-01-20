@@ -50,7 +50,7 @@ impl SubmitInvoiceDto {
             .decode(certificate)
             .map_err(|_| "invalid Base64 invoice")?;
 
-        let certificate = X509::from_der(&certificate).map_err(|_| "invalid x509 certificate")?;
+        let certificate = X509::from_pem(&certificate).map_err(|_| "invalid x509 certificate")?;
         let public_key = certificate
             .public_key()
             .map_err(|_| "certificate has no public key")?;
