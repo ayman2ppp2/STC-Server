@@ -10,7 +10,7 @@ use crate::{
         submit_invoice_dto::SubmitInvoiceDto,
         submit_invoice_response_dto::{ClearenceStatus, MessageType, SubmitInvoiceResponse, ValidationMessage, ValidationResults, ValidationStatus},
     },
-    services::pki_service::verify_signature_with_cert,
+    services::pki_service::{verify_cert_with_ca, verify_signature_with_cert},
 };
 
 pub async fn submit_invoice( 
@@ -22,23 +22,18 @@ pub async fn submit_invoice(
         .into_inner()
         .parse()
         .map_err(actix_web::error::ErrorBadRequest)?;
-    // parse invoice
-    // intermidate_DTO
-    //     .parse_invoice()
-    //     .map_err(actix_web::error::ErrorBadRequest)?;
-    // calculate hash
+    // compare hash
     let received_hash = &intermidate_dto.invoice_hash;
     let hash = intermidate_dto
         .compute_hash()
         .map_err(actix_web::error::ErrorBadRequest)?;
-    // verify hash
     if !memcmp::eq(received_hash, &hash) {
         return Err(actix_web::error::ErrorNotAcceptable("hash mismatch"));
     }
     // verify the certificate
-    // verify_cert_with_ca(&crypto.get_ref().certificate, &intermidate_DTO.certificate)
-    //     .await
-    //     .map_err(actix_web::error::ErrorBadRequest)?;
+    verify_cert_with_ca(&crypto.get_ref().certificate, &intermidate_dto.certificate)
+        .await
+        .map_err(actix_web::error::ErrorBadRequest)?;
     // verify signature
     verify_signature_with_cert(
         &intermidate_dto.invoice_hash,
@@ -67,7 +62,7 @@ pub async fn submit_invoice(
     //     Err(e) => {
     //         Err(actix_web::error::ErrorBadRequest(e))
     //     }
-    // }
+    // } totioajoisoij
 
     Ok(HttpResponse::Ok().json(SubmitInvoiceResponse {
         clearence_status: ClearenceStatus::Cleared,

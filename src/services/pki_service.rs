@@ -2,8 +2,8 @@
 use crate::services::signer::sign;
 use base64::Engine;
 use base64::engine::general_purpose;
-use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
-
+use openssl::{asn1::Asn1Time,hash::MessageDigest, sign::Verifier, x509::X509};
+use openssl::hash::hash;
 use crate::{config::crypto_config::Crypto, models::enrollment_dto::EnrollDTO};
 
 pub async fn handle_enrollment(dto: &EnrollDTO, crypto: &Crypto) -> Result<String, String> {
@@ -81,3 +81,8 @@ pub async fn verify_signature_with_cert(
         .map_err(|e| format!("failed to verify the signature : {}", e))?;
     Ok(result)
 }
+
+pub fn compute_hash(bytes:Vec<u8>) -> anyhow::Result<Vec<u8>> {
+        let digest = hash(MessageDigest::sha256(), &bytes)?;
+        Ok(digest.to_vec())
+    }
