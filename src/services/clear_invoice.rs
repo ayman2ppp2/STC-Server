@@ -7,9 +7,11 @@ sign the signed info hash to get signature value
 build QR using invoice hash + signature
 */
 
-use crate::{models::submit_invoice_dto::{self, IntermediateInvoiceDto, SubmitInvoiceDto}, services::{extractors::extract_signed_properties, pki_service::compute_hash}};
+use crate::{models::submit_invoice_dto::IntermediateInvoiceDto, services::{editors::edit_signing_time, extractors::extract_signed_properties, pki_service::compute_hash}};
 
-pub fn clear_invoice(intermediate_dto:IntermediateInvoiceDto) ->anyhow::Result<Vec<u8>>{
+pub fn clear_invoice(intermediate_dto:IntermediateInvoiceDto) -> anyhow::Result<Vec<u8>>{
     let invoice_hash = compute_hash(intermediate_dto.canonicalized_invoice_bytes);
-    let singed_properties =  extract_signed_properties(&intermediate_dto.invoice_bytes);
+    let edited_invoice_bytes = edit_signing_time(&intermediate_dto.invoice_bytes)?;
+    let singed_properties =  extract_signed_properties(&edited_invoice_bytes);
+    
 }
