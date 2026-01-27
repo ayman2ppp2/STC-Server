@@ -64,13 +64,12 @@ pub async fn verify_signature_with_cert(
     let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey)
         .context("failed to instantiate the verifier : {}")?;
 
-    verifier
-        .update(recv_hash)
-        .map_err(|e| format!("failed to feed the hash to the verifier : {}", e))?;
+    .update(&recv_hash)
+        .context("failed to feed the hash to the verifier")?;
 
     let result = verifier
-        .verify(sig)
-        .map_err(|e| format!("failed to verify the signature : {}", e))?;
+        .verify(&sig)
+        .context("failed to verify the signature")?;
     Ok(result)
 }
 
