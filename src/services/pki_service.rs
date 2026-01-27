@@ -65,12 +65,12 @@ pub async fn verify_signature_with_cert(
         .context("failed to instantiate the verifier : {}")?;
 
     verifier
-        .update(&recv_hash)
-        .context("failed to feed the hash to the verifier")?;
+        .update(recv_hash)
+        .map_err(|e| format!("failed to feed the hash to the verifier : {}", e))?;
 
     let result = verifier
-        .verify(&sig)
-        .context("failed to verify the signature")?;
+        .verify(sig)
+        .map_err(|e| format!("failed to verify the signature : {}", e))?;
     Ok(result)
 }
 
