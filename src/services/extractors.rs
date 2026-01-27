@@ -1,6 +1,6 @@
 use std::io::Cursor;
 use crate::services::c14n11::canonicalize_c14n11;
-use anyhow::anyhow;
+use anyhow:: anyhow;
 use quick_xml::{Reader, Writer, events::Event};
 pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     // Remove XML declaration if present
@@ -167,7 +167,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let cleaned_xml = writer.into_inner();
     Ok(cleaned_xml)
 }
-pub fn extract_sig_crt(xml: &str) -> (String, String) {
+pub fn extract_sig_crt(xml: &str) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
 
@@ -202,9 +202,9 @@ pub fn extract_sig_crt(xml: &str) -> (String, String) {
         buf.clear();
     }
 
-    (signature, certificate)
+    Ok((signature.into(), certificate.into()))
 }
-pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<String> {
+pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(false);
 
@@ -265,7 +265,7 @@ pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<String> {
         buf.clear();
     }
 
-    Ok(String::from_utf8(writer.into_inner().into_inner())?)
+    Ok(writer.into_inner().into_inner())
 }
 
 
@@ -294,7 +294,7 @@ mod tests {
                                 </xades:SignedProperties>
                             </xades:QualifyingProperties>"#;
 
-        assert_eq!(extract_signed_properties(&xml.to_vec()).unwrap(),r#"<xades:SignedProperties Id="xadesSignedProperties">
+        assert_eq!(extract_signed_properties(&xml.to_vec()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties">
                                     <xades:SignedSignatureProperties>
                                         <xades:SigningTime>109384180981</xades:SigningTime> //the signging time (will change)
                                         <xades:SigningCertificate>

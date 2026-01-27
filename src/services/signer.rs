@@ -1,13 +1,11 @@
+
 use openssl::{
-    asn1::Asn1Time,
-    bn::BigNum,
-    hash::MessageDigest,
-    x509::{X509, X509Builder, X509Req},
+    asn1::Asn1Time, bn::BigNum, hash::MessageDigest, sign::Signer, x509::{X509, X509Builder, X509Req}
 };
 
 use crate::config::crypto_config::Crypto;
 
-pub async fn sign(req: X509Req, crypto: &Crypto) -> Result<X509, openssl::error::ErrorStack> {
+pub async fn sign_csr(req: X509Req, crypto: &Crypto) -> Result<X509, openssl::error::ErrorStack> {
     let pubkey = req.public_key()?;
 
     let mut builder = X509Builder::new()?;
@@ -28,4 +26,10 @@ pub async fn sign(req: X509Req, crypto: &Crypto) -> Result<X509, openssl::error:
     builder.sign(&crypto.private_key, MessageDigest::sha256())?;
 
     Ok(builder.build())
+}
+pub fn sign(hash :Vec<u8>,crypto: &Crypto) -> anyhow::Result<Vec<u8>>{
+    let mut signer =  Signer::new(MessageDigest::sha256(), &crypto.private_key)?;
+    signer.update(&hash)?;
+    let signature = signer.sign_to_vec()?;
+    Ok(signature)
 }

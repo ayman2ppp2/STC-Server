@@ -27,31 +27,31 @@ pub struct IntermediateInvoiceDto {
 }
 
 impl SubmitInvoiceDto {
-    pub fn parse(self) -> Result<IntermediateInvoiceDto, String> {
+    pub fn parse(self) -> anyhow::Result<IntermediateInvoiceDto> {
         let invoice_bytes = general_purpose::STANDARD
             .decode(self.invoice)
-            .map_err(|_| "invalid Base64 invoice")?;
+            ?;
         let (signature, certificate) = extract_sig_crt(
             &String::from_utf8(invoice_bytes.clone())
-                .map_err(|_| "failed to parse the invoice bytes")?,
-        );
+                ?,
+        )?;
         let canonicalized_invoice_bytes = canonicalize_c14n11(extract_invoice(&invoice_bytes)?)?;
 
         let invoice_hash = general_purpose::STANDARD
             .decode(self.invoice_hash)
-            .map_err(|_| "invalid invoice hash")?;
+            ?;
         let invoice_signature = general_purpose::STANDARD
             .decode(signature)
-            .map_err(|_| "invalid base64 signature")?;
+            ?;
 
         let certificate = general_purpose::STANDARD
             .decode(certificate)
-            .map_err(|_| "invalid Base64 invoice")?;
+            ?;
 
-        let certificate = X509::from_pem(&certificate).map_err(|_| "invalid x509 certificate")?;
+        let certificate = X509::from_pem(&certificate)?;
         let public_key = certificate
             .public_key()
-            .map_err(|_| "certificate has no public key")?;
+            ?;
         Ok(IntermediateInvoiceDto {
             invoice_bytes,
             canonicalized_invoice_bytes,

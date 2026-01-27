@@ -10,7 +10,7 @@ use crate::{
         submit_invoice_dto::SubmitInvoiceDto,
         submit_invoice_response_dto::{ClearenceStatus, MessageType, SubmitInvoiceResponse, ValidationMessage, ValidationResults, ValidationStatus},
     },
-    services::pki_service::{verify_cert_with_ca, verify_signature_with_cert},
+    services::pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert},
 };
 
 pub async fn submit_invoice( 
@@ -24,9 +24,7 @@ pub async fn submit_invoice(
         .map_err(actix_web::error::ErrorBadRequest)?;
     // compare hash
     let received_hash = &intermidate_dto.invoice_hash;
-    let hash = intermidate_dto
-        .compute_hash()
-        .map_err(actix_web::error::ErrorBadRequest)?;
+    let hash = compute_hash(&intermidate_dto.canonicalized_invoice_bytes).map_err(actix_web::error::ErrorBadRequest)?;
     if !memcmp::eq(received_hash, &hash) {
         return Err(actix_web::error::ErrorNotAcceptable("hash mismatch"));
     }
