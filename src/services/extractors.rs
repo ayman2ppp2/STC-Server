@@ -19,7 +19,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut writer = Writer::new(Vec::new());
     let mut buf = Vec::new();
 
-    let mut skip_depth = 0usize; 
+    let mut skip_depth = 0usize;
 
     let mut adr_depth = 0usize;
     let mut adr_has_qr = false;
@@ -30,7 +30,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
         match reader.read_event_into(&mut buf) {
             /* ---------- START ---------- */
             Ok(Event::Start(e)) => {
-                
+
 
                 if skip_depth > 0 {
                     skip_depth += 1;
@@ -61,7 +61,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
 
             /* ---------- END ---------- */
             Ok(Event::End(e)) => {
-                
+
 
                 if skip_depth > 0 {
                     skip_depth -= 1;
@@ -101,7 +101,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
 
             /* ---------- EMPTY ---------- */
             Ok(Event::Empty(e)) => {
-               
+
 
                 if skip_depth > 0 {
                     // skip
@@ -167,8 +167,8 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let cleaned_xml = writer.into_inner();
     Ok(cleaned_xml)
 }
-pub fn extract_sig_crt(xml: &str) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
-    let mut reader = Reader::from_str(xml);
+pub fn extract_sig_crt(xml: &Vec<u8>) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+    let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(true);
 
     let mut buf = Vec::with_capacity(1024);

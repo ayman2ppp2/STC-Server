@@ -32,8 +32,7 @@ impl SubmitInvoiceDto {
             .decode(self.invoice)
             ?;
         let (signature, certificate) = extract_sig_crt(
-            &String::from_utf8(invoice_bytes.clone())
-                ?,
+            &invoice_bytes
         )?;
         let canonicalized_invoice_bytes = canonicalize_c14n11(extract_invoice(&invoice_bytes)?)?;
 

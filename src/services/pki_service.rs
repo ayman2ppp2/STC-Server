@@ -62,14 +62,15 @@ pub async fn verify_signature_with_cert(
         .public_key()
         .context("failed to extract the public key from the provided cerificate ")?;
     let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey)
-        .context("failed to instantiate the verifier : {}")?;
+        .context("failed to instantiate the verifier")?;
 
-    .update(&recv_hash)
-        .context("failed to feed the hash to the verifier")?;
+    verifier
+        .update(recv_hash)
+        .context("failed to feed the hash to the verifier ")?;
 
     let result = verifier
-        .verify(&sig)
-        .context("failed to verify the signature")?;
+        .verify(sig)
+        .context("failed to verify the signature ")?;
     Ok(result)
 }
 
