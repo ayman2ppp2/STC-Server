@@ -180,8 +180,8 @@ pub fn extract_sig_crt(xml: &Vec<u8>) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => match e.local_name().as_ref() {
-                b"ds:SignatureValue" => current = 1,
-                b"ds:X509Certificate" => current = 2,
+                b"SignatureValue" => current = 1,
+                b"X509Certificate" => current = 2,
                 _ => {}
             },
 

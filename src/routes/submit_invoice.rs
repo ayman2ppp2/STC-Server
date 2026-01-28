@@ -10,19 +10,21 @@ use crate::{
         submit_invoice_dto::SubmitInvoiceDto,
         submit_invoice_response_dto::{ClearenceStatus, MessageType, SubmitInvoiceResponse, ValidationMessage, ValidationResults, ValidationStatus},
     },
-    services::pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert},
+    services::{clear_invoice::{self, clear_invoice}, pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert}},
 };
 
-pub async fn submit_invoice( 
-    db_pool: web::Data<PgPool>, 
+pub async fn submit_invoice(
+    db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    print!("entring the dto parsing phase");
     let intermidate_dto = invoice_dto
         .into_inner()
         .parse()
-        .map_err(actix_web::error::ErrorBadRequest)?;
+        .map_err(actix_web::error::ErrorForbidden)?;
     // compare hash
+    print!("finished parsing the intermediate dto");
     let received_hash = &intermidate_dto.invoice_hash;
     let hash = compute_hash(&intermidate_dto.canonicalized_invoice_bytes).map_err(actix_web::error::ErrorBadRequest)?;
     if !memcmp::eq(received_hash, &hash) {
@@ -40,31 +42,12 @@ pub async fn submit_invoice(
     )
     .await
     .map_err(actix_web::error::ErrorBadRequest)?;
-    // if valid save the invoice and return an OK ,else return the problem and descard the invoice
-    // match intermidate_DTO.parse_invoice() {
-    //     Ok(invoice) => {
-    //         let raw_data = String::from_utf8(intermidate_DTO.invoice_bytes)
-    //             .expect("failed to convert the raw invoice bytes into a str");
-    //         match save_invoice(db_pool.get_ref(), &invoice, &raw_data).await {
-    //             Ok(_) => {
-    //                 println!("Saved invoice successfully");
-    //                 Ok(HttpResponse::Ok().body("the invoice is saved successfully"))
-    //             }
-    //             Err(e) => {
-    //                 eprintln!("DB error saving invoice: {}", e);
-    //                 Ok(HttpResponse::InternalServerError()
-    //                     .body(format!("Failed to save invoice: {}", e)))
-    //             }
-    //         }
-    //     }
-    //     Err(e) => {
-    //         Err(actix_web::error::ErrorBadRequest(e))
-    //     }
-    // } totioajoisoij
+
+    let cleared_invoice = clear_invoice(intermidate_dto, &crypto).map_err(actix_web::error::ErrorInternalServerError)?;
 
     Ok(HttpResponse::Ok().json(SubmitInvoiceResponse {
         clearence_status: ClearenceStatus::Cleared,
-        cleared_invoice: "blablabla".to_string(),
+        cleared_invoice: String::from_utf8_lossy(&cleared_invoice).into(),
         validation_results: ValidationResults {
             info_messages:vec![
                 ValidationMessage{
@@ -95,7 +78,7 @@ pub async fn submit_invoice(
 async fn save_invoice(
     pool: &PgPool,
     invoice: &models::invoice_model::Invoice,
-    raw_xml: &str, 
+    raw_xml: &str,
 ) -> Result<(), sqlx::Error> {
     // helper: we'll use .as_deref() and .as_ref() inline to borrow inner strings
 
