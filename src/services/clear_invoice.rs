@@ -20,9 +20,12 @@ use crate::{
 
 pub fn clear_invoice(intermediate_dto: IntermediateInvoiceDto,crypto :&Crypto) -> anyhow::Result<Vec<u8>> {
     let invoice_hash = compute_hash(&intermediate_dto.canonicalized_invoice_bytes)?;
+    dbg!(String::from_utf8_lossy(&intermediate_dto.invoice_bytes));
     let edited_signed_properties_invoice_bytes =
         edit_signing_time(&intermediate_dto.invoice_bytes)?;
+        dbg!(String::from_utf8_lossy(&edited_signed_properties_invoice_bytes));
     let signed_properties = extract_signed_properties(&edited_signed_properties_invoice_bytes)?;
+    dbg!(String::from_utf8_lossy(&signed_properties));
     let signed_properties_hash = compute_hash(&canonicalize_c14n11(signed_properties)?)?;
     let edited_signed_info_invoice_bytes = edit_signed_info(
         &intermediate_dto.invoice_bytes,

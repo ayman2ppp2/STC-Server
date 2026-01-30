@@ -241,11 +241,11 @@ pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
                 }
             }
 
-            Event::CData(e) => {
-                if capturing {
-                    writer.write_event(Event::CData(e.to_owned()))?;
-                }
-            }
+            // Event::CData(e) => {
+            //     if capturing {
+            //         writer.write_event(Event::CData(e.to_owned()))?;
+            //     }
+            // }
 
             Event::End(e) => {
                 if capturing {
