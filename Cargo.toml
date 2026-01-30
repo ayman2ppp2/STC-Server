@@ -18,3 +18,4 @@ hex = "0.4.3"
 xml_c14n = "0.3.0"
 chrono = "0.4.43"
 anyhow = "1.0.100"
+uuid = {version ="1.20.0",features=["v4"]}
