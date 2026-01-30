@@ -1,6 +1,7 @@
 /target
 /stc-pki
 canon.xml
-test.sh
+# test.sh
 test.xml
 response.json
+.vscode/launch.json
