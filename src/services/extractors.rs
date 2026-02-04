@@ -1,7 +1,6 @@
-use std::io::Cursor;
-use crate::services::c14n11::canonicalize_c14n11;
-use anyhow:: anyhow;
+use anyhow::anyhow;
 use quick_xml::{Reader, Writer, events::Event};
+use std::io::Cursor;
 pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     // Remove XML declaration if present
     let raw_xml = if raw_xml.starts_with(b"<?xml") {
@@ -30,39 +29,31 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
         match reader.read_event_into(&mut buf) {
             /* ---------- START ---------- */
             Ok(Event::Start(e)) => {
-
-
                 if skip_depth > 0 {
                     skip_depth += 1;
-                } else if e.local_name().as_ref() == b"UBLExtensions" || e.local_name().as_ref() == b"Signature" {
+                } else if e.local_name().as_ref() == b"UBLExtensions"
+                    || e.local_name().as_ref() == b"Signature"
+                {
                     skip_depth = 1;
                 } else if e.local_name().as_ref() == b"AdditionalDocumentReference" {
                     adr_depth = 1;
                     adr_has_qr = false;
                     in_adr_id = false;
                     adr_writer = Writer::new(Vec::new());
-                    adr_writer
-                        .write_event(Event::Start(e.to_owned()))
-                        ?;
+                    adr_writer.write_event(Event::Start(e.to_owned()))?;
                 } else if adr_depth > 0 {
                     adr_depth += 1;
                     if e.local_name().as_ref() == b"bID" {
                         in_adr_id = true;
                     }
-                    adr_writer
-                        .write_event(Event::Start(e.to_owned()))
-                         ?;
+                    adr_writer.write_event(Event::Start(e.to_owned()))?;
                 } else {
-                    writer
-                        .write_event(Event::Start(e.to_owned()))
-                         ?;
+                    writer.write_event(Event::Start(e.to_owned()))?;
                 }
             }
 
             /* ---------- END ---------- */
             Ok(Event::End(e)) => {
-
-
                 if skip_depth > 0 {
                     skip_depth -= 1;
                 } else if adr_depth > 0 {
@@ -71,9 +62,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                     }
 
                     adr_depth -= 1;
-                    adr_writer
-                        .write_event(Event::End(e.to_owned()))
-                         ?;
+                    adr_writer.write_event(Event::End(e.to_owned()))?;
 
                     if adr_depth == 0 && !adr_has_qr {
                         let bytes = adr_writer.into_inner();
@@ -83,8 +72,8 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                         loop {
                             match r.read_event_into(&mut b) {
                                 Ok(Event::Eof) => break,
-                                Ok(ev) => writer.write_event(ev) ?,
-                                Err(e) => return Err( e.into()),
+                                Ok(ev) => writer.write_event(ev)?,
+                                Err(e) => return Err(e.into()),
                             }
                             b.clear();
                         }
@@ -93,36 +82,26 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                         adr_writer = Writer::new(Vec::new());
                     }
                 } else {
-                    writer
-                        .write_event(Event::End(e.to_owned()))
-                         ?;
+                    writer.write_event(Event::End(e.to_owned()))?;
                 }
             }
 
             /* ---------- EMPTY ---------- */
             Ok(Event::Empty(e)) => {
-
-
-                if skip_depth > 0 {
-                    // skip
-                } else if e.local_name().as_ref() == b"UBLExtensions" || e.local_name().as_ref() == b"Signature" {
+                if e.local_name().as_ref() == b"UBLExtensions"
+                    || e.local_name().as_ref() == b"Signature"
+                {
                     // skip
                 } else if adr_depth > 0 {
-                    adr_writer
-                        .write_event(Event::Empty(e.to_owned()))
-                         ?;
+                    adr_writer.write_event(Event::Empty(e.to_owned()))?;
                 } else {
-                    writer
-                        .write_event(Event::Empty(e.to_owned()))
-                         ?;
+                    writer.write_event(Event::Empty(e.to_owned()))?;
                 }
             }
 
             /* ---------- TEXT ---------- */
             Ok(Event::Text(e)) => {
-                let text = std::str::from_utf8(e.as_ref())
-                     ?
-                    .trim();
+                let text = std::str::from_utf8(e.as_ref())?.trim();
 
                 if adr_depth > 0 && in_adr_id && text == "QR" {
                     adr_has_qr = true;
@@ -130,13 +109,9 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
 
                 if skip_depth == 0 {
                     if adr_depth > 0 {
-                        adr_writer
-                            .write_event(Event::Text(e.to_owned()))
-                             ?;
+                        adr_writer.write_event(Event::Text(e.to_owned()))?;
                     } else {
-                        writer
-                            .write_event(Event::Text(e.to_owned()))
-                             ?;
+                        writer.write_event(Event::Text(e.to_owned()))?;
                     }
                 }
             }
@@ -147,13 +122,9 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
             Ok(ev) => {
                 if skip_depth == 0 {
                     if adr_depth > 0 {
-                        adr_writer
-                            .write_event(ev.to_owned())
-                             ?;
+                        adr_writer.write_event(ev.to_owned())?;
                     } else {
-                        writer
-                            .write_event(ev.to_owned())
-                             ?;
+                        writer.write_event(ev.to_owned())?;
                     }
                 }
             }
@@ -167,7 +138,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let cleaned_xml = writer.into_inner();
     Ok(cleaned_xml)
 }
-pub fn extract_sig_crt(xml: &Vec<u8>) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(true);
 
@@ -204,7 +175,7 @@ pub fn extract_sig_crt(xml: &Vec<u8>) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
 
     Ok((signature.into(), certificate.into()))
 }
-pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(false);
 
@@ -217,7 +188,7 @@ pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
     loop {
         match reader.read_event_into(&mut buf)? {
             Event::Start(e) => {
-                if e.local_name().as_ref()== b"SignedProperties" {
+                if e.local_name().as_ref() == b"SignedProperties" {
                     capturing = true;
                     depth = 1;
                 } else if capturing {
@@ -246,7 +217,6 @@ pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
             //         writer.write_event(Event::CData(e.to_owned()))?;
             //     }
             // }
-
             Event::End(e) => {
                 if capturing {
                     writer.write_event(Event::End(e.to_owned()))?;
@@ -268,10 +238,103 @@ pub fn extract_signed_properties(xml: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
     Ok(writer.into_inner().into_inner())
 }
 
+pub fn extract_company_id(invoice: &[u8]) -> anyhow::Result<String> {
+    let mut reader = Reader::from_reader(Cursor::new(invoice));
+    reader.config_mut().trim_text(true);
 
+    let mut buf = Vec::with_capacity(1024);
+
+    let mut current = 0u8;
+    let mut in_accounting_customer_party = false;
+    let mut company_id = String::with_capacity(2048);
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                if e.local_name().as_ref() == b"AccountingCustomerParty" {
+                    in_accounting_customer_party = true
+                }
+                if e.local_name().as_ref() == b"CompanyID" {
+                    current = 1
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                if in_accounting_customer_party {
+                    let text = e.decode().expect("failed to decode the xml");
+                    if current == 1 {
+                        company_id.push_str(&text)
+                    }
+                }
+            }
+
+            Ok(Event::End(_)) => current = 0,
+            Ok(Event::Eof) => break,
+            Err(e) => panic!("XML error: {e}"),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    Ok(company_id)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn test_extract_company_id() {
+        let xml = 
+        br#"<cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="CRN">1010010000</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PostalAddress>
+                <cbc:StreetName>  | Prince Sultan</cbc:StreetName>
+                <cbc:BuildingNumber>2322</cbc:BuildingNumber>
+                <cbc:CitySubdivisionName> | Al-Murabba</cbc:CitySubdivisionName>
+                <cbc:CityName> | Riyadh</cbc:CityName>
+                <cbc:PostalZone>23333</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>SA</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+            <cac:PartyTaxScheme>
+                <cbc:CompanyID>399999999900003</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName> | Maximum Speed Tech Supply LTD</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cac:PostalAddress>
+                <cbc:StreetName> | Salah Al-Din</cbc:StreetName>
+                <cbc:BuildingNumber>1111</cbc:BuildingNumber>
+                <cbc:CitySubdivisionName> | Al-Murooj</cbc:CitySubdivisionName>
+                <cbc:CityName> | Riyadh</cbc:CityName>
+                <cbc:PostalZone>12222</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>SA</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+            <cac:PartyTaxScheme>
+                <cbc:CompanyID>399999999800003</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>    | Fatoora Samples LTD</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingCustomerParty>"#;
+        assert_eq!(extract_company_id(xml).unwrap(), "399999999800003")
+    }
     #[test]
     fn test_extract_signed_properties() {
         let xml = br#"<xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="signature">
@@ -294,7 +357,7 @@ mod tests {
                                 </xades:SignedProperties>
                             </xades:QualifyingProperties>"#;
 
-        assert_eq!(extract_signed_properties(&xml.to_vec()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties">
+        assert_eq!(extract_signed_properties(xml.as_ref()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties">
                                     <xades:SignedSignatureProperties>
                                         <xades:SigningTime>109384180981</xades:SigningTime> //the signging time (will change)
                                         <xades:SigningCertificate>

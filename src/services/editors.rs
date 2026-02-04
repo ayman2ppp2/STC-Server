@@ -77,7 +77,7 @@ pub fn edit_signing_time(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                 writer.write_event(ev.to_owned())?;
             }
 
-            Err(e) => return Err(anyhow!("XML parse error")),
+            Err(e) => return Err(anyhow!(format!("XML parse error : {}",e))),
         }
 
         buf.clear();
@@ -137,7 +137,7 @@ pub fn edit_signed_info(
             }
 
             Event::End(e) => {
-                let local = e.local_name().as_ref();
+               
 
                 if e.local_name().as_ref() == b"Reference" {
                     active_ref = ActiveReference::Other;
@@ -242,7 +242,7 @@ pub fn edit_signature(xml: &[u8], signature: String) -> anyhow::Result<Vec<u8>> 
                 writer.write_event(ev.to_owned())?;
             }
 
-            Err(e) => return Err(anyhow!("XML parse error")),
+            Err(e) => return Err(anyhow!(format!("XML parse error: {}", e))),
         }
 
         buf.clear();
@@ -250,6 +250,10 @@ pub fn edit_signature(xml: &[u8], signature: String) -> anyhow::Result<Vec<u8>> 
 
     Ok(writer.into_inner())
 }
+
+// pub fn edit_invoice(xml :&[u8]) -> anyhow::Result<Vec<u8>>{
+    
+// }
 
 #[cfg(test)]
 mod tests {

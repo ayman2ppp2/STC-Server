@@ -1,8 +1,7 @@
 use crate::services::signer::sign_csr;
 use crate::{config::crypto_config::Crypto, models::enrollment_dto::EnrollDTO};
 use anyhow::{Context, anyhow};
-use base64::Engine;
-use base64::engine::general_purpose;
+
 use openssl::hash::hash;
 use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
 
@@ -35,12 +34,7 @@ pub async fn handle_enrollment(dto: &EnrollDTO, crypto: &Crypto) -> Result<Strin
         .map_err(|e| format!("failed to convert the certificate to a String : {}", e))
 }
 
-pub fn x509_to_base64(cert: &X509) -> anyhow::Result<String> {
-    let der_bytes = cert
-        .to_pem()
-        .context("Failed to convert certificate to DER")?;
-    Ok(general_purpose::STANDARD.encode(&der_bytes))
-}
+
 
 // wite a function that gets submit_invoice certificate and then verifies it returning a bool
 
@@ -54,8 +48,8 @@ pub async fn verify_cert_with_ca(ca_crt: &X509, client_crt: &X509) -> anyhow::Re
 }
 
 pub async fn verify_signature_with_cert(
-    recv_hash: &Vec<u8>,
-    sig: &Vec<u8>,
+    recv_hash: &[u8],
+    sig: &[u8],
     crt: &X509,
 ) -> anyhow::Result<bool> {
     let pkey = crt
@@ -74,7 +68,7 @@ pub async fn verify_signature_with_cert(
     Ok(result)
 }
 
-pub fn compute_hash(bytes: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
-    let digest = hash(MessageDigest::sha256(), &bytes)?;
+pub fn compute_hash(bytes: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let digest = hash(MessageDigest::sha256(), bytes)?;
     Ok(digest.to_vec())
 }

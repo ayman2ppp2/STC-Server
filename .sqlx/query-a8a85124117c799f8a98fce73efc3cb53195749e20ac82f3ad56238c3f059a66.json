@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n    INSERT INTO invoices (invoiceb64, uuid, hash, company) \n    VALUES ($1, $2, $3, $4)\n    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a8a85124117c799f8a98fce73efc3cb53195749e20ac82f3ad56238c3f059a66"
+}

@@ -1,4 +1,4 @@
-use crate::routes::{enroll::enroll, on_boarding::on_board, token_generator::{self, token_generator}};
+use crate::routes::{enroll::enroll, on_boarding::on_board, token_generator::token_generator};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
@@ -17,20 +17,7 @@ async fn get_invoices(db: web::Data<PgPool>) -> impl Responder {
     let result = sqlx::query(
         r#"
         SELECT
-            id,
-            issue_date,
-            invoice_type_code,
-            document_currency_code,
-            supplier_party_id,
-            customer_party_id,
-            tax_total_amount,
-            tax_total_currency,
-            line_extension_amount,
-            tax_exclusive_amount,
-            tax_inclusive_amount,
-            payable_amount,
-            raw_xml,
-            created_at
+            *
         FROM invoices
         ORDER BY created_at DESC
         "#,
@@ -76,7 +63,7 @@ async fn main() -> std::io::Result<()> {
 
     let pool = PgPool::connect(&database_url)
         .await
-        .expect(&format!("Failed to connect to Postgres: {}", database_url));
+        .unwrap_or_else(|_| panic!("Failed to connect to Postgres: {}", database_url));
     let crypto_config = match Crypto::from_env().await {
         Ok(crypto_config) => crypto_config,
         Err(e) => panic!("error in the reading of the crypto_config from env :{}", e),
@@ -93,6 +80,7 @@ async fn main() -> std::io::Result<()> {
             .route("/enroll", web::post().to(enroll))
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))
+            .route("/get_invoices", web::get().to(get_invoices))
     })
     .bind(("0.0.0.0", port))?
     .run()

@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug,Deserialize,Serialize)]
-pub struct onboardDto{
+pub struct OnboardDto{
     pub name : String,
     pub email : String,
     pub company : String,
 }
 #[derive(Debug,Serialize)]
-pub struct onBoardResponseDto{
+pub struct OnBoardResponseDto{
     pub message : String,
     pub token : String,
 }

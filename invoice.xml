@@ -1,107 +1,229 @@
+
 <?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
     xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
     xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
-    xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
-    xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
-    xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
+    xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
     <ext:UBLExtensions>
         <ext:UBLExtension>
+            <ext:ExtensionURI>urn:oasis:names:specification:ubl:dsig:enveloped:xades</ext:ExtensionURI>
             <ext:ExtensionContent>
-                <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="signature">
-                    <ds:SignedInfo>
-                        <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-                        <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
-                        <ds:Reference URI="">
-                            <ds:Transforms>
-                                <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
-                                <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
-                            </ds:Transforms>
-                            <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-                            <ds:DigestValue>FTf6kMuVk8skK4cUNGbmSoHb7JX/f3SHN05J+f7p4Y4=</ds:DigestValue>
-                        </ds:Reference>
-                        <ds:Reference URI="#xadesSignedProperties" Type="http://uri.etsi.org/01903#SignedProperties">
-                            <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-                            <ds:DigestValue>2oXFlHsp5R0x6/cTNYJOXrsdHSBGNcccPsd3rEbQ/0U=</ds:DigestValue>
-                        </ds:Reference>
-                    </ds:SignedInfo>
-                    <ds:SignatureValue>rnCX+Q055j6UmfOc2vLgVFsm+wvvJF9EjFkXn01Y/L8UuMXKeEsOFSmu4Ciccae72ZKypB2An8g5WWFRr5ISptsZ6TshGsEXYIz9ahGOyXSbRqUvoQ6eLpiVrqwLsYGlVZ922K7q+AeKXnWUAKsCtorOS1QgEHnX73vrdZTbIReAmkUj9F6yIoARZQYA+i0HedmpXA5lwBWpTZ8LPz0jjXMGOuC5uIwN9QaK8utQSTCmTnW/EGe5koue8OAXca47LCQpF6DBvoNEfNCQQcLqa8nkpPcoDwZSDmgMS5XJKAHAUmMAgVEgY74g1+qiqTtAiYKpD+s2wDrlp9d6ak7pcA==</ds:SignatureValue>
-                    <ds:KeyInfo>
-                        <ds:X509Data>
-                            <ds:X509Certificate>LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURERENDQWZTZ0F3SUJBZ0lRYlNJZEdqazAxVWVoUkoxdmttWHdhekFOQmdrcWhraUc5dzBCQVFzRkFEQXgKTVFzd0NRWURWUVFHRXdKVFJERU1NQW9HQTFVRUNnd0RVMVJETVJRd0VnWURWUVFEREF0VFZFTWdVbTl2ZENCRApRVEFlRncweU5qQXhNamd4TnpNeE1qZGFGdzB5TnpBeE1Ua3hOek14TWpkYU1GTXhDekFKQmdOVkJBWVRBbE5FCk1SY3dGUVlEVlFRS0RBNU5lU0JEYjIxd1lXNTVJRXgwWkRFTE1Ba0dBMVVFQ3d3Q1NWUXhIakFjQmdOVkJBTU0KRlcxbGNtTm9ZVzUwTG0xNVkyOXRjR0Z1ZVM1elpEQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQURnZ0VQQURDQwpBUW9DZ2dFQkFOZVFsSkl0SDFvSXoxenU1QWs0ZWlEK2p5WkpneGZnUk1wWFNaTXpJRzJZTEdOQ1NDVWNWaWJyCmZzdVluUDVuMUF6aE1XMCtpL3VER0RWcmpvS0VnNGdJWElkNTVZdW83QkEveWtaNXZsZ2VXdmV4U3JqRFUvNGcKbGZOTWwwTzIzVHh6STFRNk9PTGp6alcvRk02bzZBcGdBQlA1SnpYUHV6WjhQN3dBTFcxVWxya0FoZlFJZkZBcApGUll5NnYvUlhMTkRiYk9IdnAvcVpUeFFsczY4V3B5bS9nYTQyUFNkdmlaSzMrWHBUbkprNVBPN0ZZTDVXRENYClVkOEhvMGJLelZ0SHhuWFFycTdVOS9ISUMxdW9iZldpMzJSWXEvWVRCemY1S09WRXRWWFBqR2tPaG1pRVBWRW0KQUJkRXJ4WWh6ZzNWKzMxQ215dlRwOElySG5pNk1JOENBd0VBQVRBTkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQQpTTFpJdGRWeXZaY3BuNkJYVnd3eG9yeEI0T2FVMmVmN2RQWE9QQmU4bHhNYlhUOHhTSGRrWGlpcGJzVmltalh2CnZkYXlyYTlqWEhpVkxiWnNmdlByY0RJRUNlVUFMb0U5L1k5TWlpc0cwV3RnaFZHNnNuNlgrRzBtT1NjTmFQOXcKUjU2L290cnhlSmpITWZTbS9IZzlIUWlQWTVjZHV1SFpGU3oyZCtZWjRjRE1SZWdtbXQrV0hvWmpoVU9yb01ROQpCQWNtRDBKMmFpaWdhSEFpYXRWOUw0bnUrVDRTblVJOGJONW0xQXJYemo3ZC8xdWdvb0M3UEZiMmk4eUNITTRMCklhdjA2Uit2MFpmK3kybkQzZm1OaFkxQVZBbytRNnhXZ2JNV3VUcWRGSmx6cVJmQndKTUNMQlFzajlKQk1DOTgKQXdDVXo5dFMzeWIxb0ZPSVZ6YzFVdz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K</ds:X509Certificate>
-                        </ds:X509Data>
-                    </ds:KeyInfo>
-                    <ds:Object>
-                        <SignedProperties Id="xadesSignedProperties"/>
-                    </ds:Object>
-                </ds:Signature>
+                <sig:UBLDocumentSignatures xmlns:sig="urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2"
+                    xmlns:sac="urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2"
+                    xmlns:sbc="urn:oasis:names:specification:ubl:schema:xsd:SignatureBasicComponents-2">
+                    <sac:SignatureInformation>
+                        <cbc:ID>urn:oasis:names:specification:ubl:signature:1</cbc:ID>
+                        <sbc:ReferencedSignatureID>urn:oasis:names:specification:ubl:signature:Invoice</sbc:ReferencedSignatureID>
+                        <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="signature">
+                            <ds:SignedInfo>
+                                <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2006/12/xml-c14n11"/>
+                                <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"/>
+                                <ds:Reference Id="invoiceSignedData" URI="">
+                                    <ds:Transforms>
+                                        <ds:Transform Algorithm="http://www.w3.org/TR/1999/REC-xpath-19991116">
+                                            <ds:XPath>not(//ancestor-or-self::ext:UBLExtensions)</ds:XPath>
+                                        </ds:Transform>
+                                        <ds:Transform Algorithm="http://www.w3.org/TR/1999/REC-xpath-19991116">
+                                            <ds:XPath>not(//ancestor-or-self::cac:Signature)</ds:XPath>
+                                        </ds:Transform>
+                                        <ds:Transform Algorithm="http://www.w3.org/TR/1999/REC-xpath-19991116">
+                                            <ds:XPath>not(//ancestor-or-self::cac:AdditionalDocumentReference[cbc:ID='QR'])</ds:XPath>
+                                        </ds:Transform>
+                                        <ds:Transform Algorithm="http://www.w3.org/2006/12/xml-c14n11"/>
+                                    </ds:Transforms>
+                                    <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                                    <ds:DigestValue>kE/8CgD0qXeFgDsOQVsO9VesvuLaV19hYTxdmyJoa88=</ds:DigestValue>
+                                </ds:Reference>
+                                <ds:Reference Type="http://www.w3.org/2000/09/xmldsig#SignatureProperties" URI="#xadesSignedProperties">
+                                    <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                                    <ds:DigestValue>Yzc3Yjc0ZTVhOGM2NTU3ZDFlNzMwYjMxYTQ0MWVhOTVkMmI0ZjI0MjAxMGVmNjQ2MTMxNzM2MTc3YjRlZjgzNA==</ds:DigestValue>
+                                </ds:Reference>
+                            </ds:SignedInfo>
+                            <ds:SignatureValue>MEQCIBgfmIta7aOyNguTZQu5OvBPXv3A9nRlowsf2RNq9oyzAiBbz8kVL9iHtF051bVbTOxkg7H3u2lg+x4Rd37CUm45yA==</ds:SignatureValue>
+                            <ds:KeyInfo>
+                                <ds:X509Data>
+                                    <ds:X509Certificate>MIIERjCCA+ygAwIBAgITEQAAF0rdCD/NOmwOlgABAAAXSjAKBggqhkjOPQQDAjBiMRUwEwYKCZImiZPyLGQBGRYFbG9jYWwxEzARBgoJkiaJk/IsZAEZFgNnb3YxFzAVBgoJkiaJk/IsZAEZFgdleHRnYXp0MRswGQYDVQQDExJQUlpFSU5WT0lDRVNDQTQtQ0EwHhcNMjMwODEzMTI1OTE5WhcNMjgwODExMTI1OTE5WjBaMQswCQYDVQQGEwJTQTEVMBMGA1UEChMMQUJDRCBMaW1pdGVkMQwwCgYDVQQLEwNLU0ExJjAkBgNVBAMTHVRTVC04ODY0MzExNDUtMzExMTExMTExMTAxMTEzMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEag/jCSQZbUJ5O3861IJePzdgj3AHkz0wA+0WrQopjI67peFDELlh+Ba3blTgnJVqxZQ5PGiVdrQJkYFMW4jQOaOCAoowggKGMIGyBgNVHREEgaowgaekgaQwgaExOzA5BgNVBAQMMjEtVFNUfDItVFNUfDMtZWQyMmYxZDgtZTZhMi0xMTE4LTliNTgtZDlhOGYxMWU0NDVmMR8wHQYKCZImiZPyLGQBAQwPMzEwMDk0MDEwMzAwMDAzMQ0wCwYDVQQMDAQxMTAwMREwDwYDVQQaDAhSUlJEMjkyOTEfMB0GA1UEDwwWUmVhbCBlc3RhdGUgYWN0aXZpdGllczAdBgNVHQ4EFgQU8vkhAx0NnA2YGo+vFVdqzJtJIRUwHwYDVR0jBBgwFoAUm8qqou2arCyQgXNW+k/Y/FP702cwTgYDVR0fBEcwRTBDoEGgP4Y9aHR0cDovL2NybDQuemF0Y2EuZ292LnNhL0NlcnRFbnJvbGwvUFJaRUlOVk9JQ0VTQ0E0LUNBKDEpLmNybDCBqAYIKwYBBQUHAQEEgZswgZgwawYIKwYBBQUHMAKGX2h0dHA6Ly9haWE0LnphdGNhLmdvdi5zYS9DZXJ0RW5yb2xsL1BSWkVJbnZvaWNlU0NBNC5leHRnYXp0Lmdvdi5sb2NhbF9QUlpFSU5WT0lDRVNDQTQtQ0EoMSkuY3J0MCkGCCsGAQUFBzABhh1odHRwOi8vY3JsNC56YXRjYS5nb3Yuc2Evb2NzcDAOBgNVHQ8BAf8EBAMCB4AwPAYJKwYBBAGCNxUHBC8wLQYlKwYBBAGCNxUIgYaoHYTQ+xKG7Z0kh877GdPAVWaH+qVlhdmEPgIBZAIBEDAdBgNVHSUEFjAUBggrBgEFBQcDAwYIKwYBBQUHAwIwJwYJKwYBBAGCNxUKBBowGDAKBggrBgEFBQcDAzAKBggrBgEFBQcDAjAKBggqhkjOPQQDAgNIADBFAiBGiqVFGlajl1L9/5Q+1ffTvsu6r4NQw2xFwJ/O0FLHaQIhAKxPySQw2vlvzbYnbsDo+IMa6uw5wMMZs520HaRJL2Sg</ds:X509Certificate>
+                                </ds:X509Data>
+                            </ds:KeyInfo>
+                            <ds:Object>
+                                <xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="signature">
+                                    <xades:SignedProperties Id="xadesSignedProperties">
+                                        <xades:SignedSignatureProperties>
+                                            <xades:SigningTime>2025-05-08T13:16:12</xades:SigningTime>
+                                            <xades:SigningCertificate>
+                                                <xades:Cert>
+                                                    <xades:CertDigest>
+                                                        <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                                                        <ds:DigestValue>M2ZmMGYzMzZmMjYxZWJlODZjMDQwMTE2YmUwZDRkY2VhZDQ3YWQ5NDcyMTgzYzY2ZDBiNzY4ZDY5MjUwYTIzZQ==</ds:DigestValue>
+                                                    </xades:CertDigest>
+                                                    <xades:IssuerSerial>
+                                                        <ds:X509IssuerName>CN=PRZEINVOICESCA4-CA, DC=extgazt, DC=gov, DC=local</ds:X509IssuerName>
+                                                        <ds:X509SerialNumber>379112699335977530084117967533366629160195914</ds:X509SerialNumber>
+                                                    </xades:IssuerSerial>
+                                                </xades:Cert>
+                                            </xades:SigningCertificate>
+                                        </xades:SignedSignatureProperties>
+                                    </xades:SignedProperties>
+                                </xades:QualifyingProperties>
+                            </ds:Object>
+                        </ds:Signature>
+                    </sac:SignatureInformation>
+                </sig:UBLDocumentSignatures>
             </ext:ExtensionContent>
         </ext:UBLExtension>
     </ext:UBLExtensions>
+
     <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
-    <cbc:ID>0c4ccf1c-5ecd-488e-9488-3b225de9c031</cbc:ID>
-    <cbc:UUID>8cde6a4a-069b-4f9b-91c7-e7fc17209c6e</cbc:UUID>
-    <cbc:IssueDate>2026-01-29</cbc:IssueDate>
-    <cbc:IssueTime>21:39:12</cbc:IssueTime>
-    <cbc:InvoiceTypeCode name="0100000">388</cbc:InvoiceTypeCode>
-    <cbc:DocumentCurrencyCode>SDG</cbc:DocumentCurrencyCode>
-    <cbc:TaxCurrencyCode>SDG</cbc:TaxCurrencyCode>
+    <cbc:ID>SME00015</cbc:ID>
+    <cbc:UUID>322efd74-5b1b-41e0-843c-1d13bec4475e</cbc:UUID>
+    <cbc:IssueDate>2022-09-05</cbc:IssueDate>
+    <cbc:IssueTime>16:50:40</cbc:IssueTime>
+    <cbc:InvoiceTypeCode name="0100000">381</cbc:InvoiceTypeCode>
+    <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
+    <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
+    <cac:BillingReference>
+        <cac:InvoiceDocumentReference>
+            <cbc:ID>SME00002</cbc:ID>
+        </cac:InvoiceDocumentReference>
+    </cac:BillingReference>
     <cac:AdditionalDocumentReference>
         <cbc:ID>ICV</cbc:ID>
-        <cbc:UUID>1</cbc:UUID>
+        <cbc:UUID>15</cbc:UUID>
     </cac:AdditionalDocumentReference>
     <cac:AdditionalDocumentReference>
         <cbc:ID>PIH</cbc:ID>
         <cac:Attachment>
-            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</cbc:EmbeddedDocumentBinaryObject>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==</cbc:EmbeddedDocumentBinaryObject>
         </cac:Attachment>
     </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>QR</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">AW/YtNix2YPYqSDYqtmI2LHZitivINin2YTYqtmD2YbZiNmE2YjYrNmK2Kcg2KjYo9mC2LXZiSDYs9ix2LnYqSDYp9mE2YXYrdiv2YjYr9ipIHwgTWF4aW11bSBTcGVlZCBUZWNoIFN1cHBseSBMVEQCDzMxMDA5NDAxMDMwMDAwMwMTMjAyMi0wOS0wNVQxNjo1MDo0MAQENC42MAUDMC42BixrRS84Q2dEMHFYZUZnRHNPUVZzTzlWZXN2dUxhVjE5aFlUeGRteUpvYTg4PQdgTUVRQ0lCZ2ZtSXRhN2FPeU5ndVRaUXU1T3ZCUFh2M0E5blJsb3dzZjJSTnE5b3l6QWlCYno4a1ZMOWlIdEYwNTFiVmJUT3hrZzdIM3UybGcreDRSZDM3Q1VtNDV5QT09CFgwVjAQBgcqhkjOPQIBBgUrgQQACgNCAARqD+MJJBltQnk7fzrUgl4/N2CPcAeTPTAD7RatCimMjrul4UMQuWH4FrduVOCclWrFlDk8aJV2tAmRgUxbiNA5</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>
+    <cac:Signature>
+        <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+        <cbc:SignatureMethod>urn:oasis:names:specification:ubl:dsig:enveloped:xades</cbc:SignatureMethod>
+    </cac:Signature>
     <cac:AccountingSupplierParty>
         <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="CRN">1010010000</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PostalAddress>
+                <cbc:StreetName>الامير سلطان | Prince Sultan</cbc:StreetName>
+                <cbc:BuildingNumber>2322</cbc:BuildingNumber>
+                <cbc:CitySubdivisionName>المربع | Al-Murabba</cbc:CitySubdivisionName>
+                <cbc:CityName>الرياض | Riyadh</cbc:CityName>
+                <cbc:PostalZone>23333</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>SA</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
             <cac:PartyTaxScheme>
-                <cbc:CompanyID>123456789</cbc:CompanyID>
+                <cbc:CompanyID>310094010300003</cbc:CompanyID>
                 <cac:TaxScheme>
                     <cbc:ID>VAT</cbc:ID>
                 </cac:TaxScheme>
             </cac:PartyTaxScheme>
             <cac:PartyLegalEntity>
-                <cbc:RegistrationName>My Supplier</cbc:RegistrationName>
+                <cbc:RegistrationName>شركة توريد التكنولوجيا بأقصى سرعة المحدودة | Maximum Speed Tech Supply LTD</cbc:RegistrationName>
             </cac:PartyLegalEntity>
         </cac:Party>
     </cac:AccountingSupplierParty>
     <cac:AccountingCustomerParty>
         <cac:Party>
+            <cac:PostalAddress>
+                <cbc:StreetName>صلاح الدين | Salah Al-Din</cbc:StreetName>
+                <cbc:BuildingNumber>1111</cbc:BuildingNumber>
+                <cbc:CitySubdivisionName>المروج | Al-Murooj</cbc:CitySubdivisionName>
+                <cbc:CityName>الرياض | Riyadh</cbc:CityName>
+                <cbc:PostalZone>12222</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>SA</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
             <cac:PartyTaxScheme>
-                <cbc:CompanyID>5566778899</cbc:CompanyID>
+                <cbc:CompanyID>399999999800003</cbc:CompanyID>
                 <cac:TaxScheme>
                     <cbc:ID>VAT</cbc:ID>
                 </cac:TaxScheme>
             </cac:PartyTaxScheme>
             <cac:PartyLegalEntity>
-                <cbc:RegistrationName>Default Customer</cbc:RegistrationName>
+                <cbc:RegistrationName>شركة نماذج فاتورة المحدودة | Fatoora Samples LTD</cbc:RegistrationName>
             </cac:PartyLegalEntity>
         </cac:Party>
     </cac:AccountingCustomerParty>
+    <cac:Delivery>
+        <cbc:ActualDeliveryDate>2022-09-05</cbc:ActualDeliveryDate>
+    </cac:Delivery>
+    <cac:PaymentMeans>
+        <cbc:PaymentMeansCode>10</cbc:PaymentMeansCode>
+        <cbc:InstructionNote>CANCELLATION_OR_TERMINATION</cbc:InstructionNote>
+    </cac:PaymentMeans>
+    <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:AllowanceChargeReason>discount</cbc:AllowanceChargeReason>
+        <cbc:Amount currencyID="SAR">0.00</cbc:Amount>
+        <cac:TaxCategory>
+            <cbc:ID schemeID="UN/ECE 5305" schemeAgencyID="6">S</cbc:ID>
+            <cbc:Percent>15</cbc:Percent>
+            <cac:TaxScheme>
+                <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">VAT</cbc:ID>
+            </cac:TaxScheme>
+        </cac:TaxCategory>
+    </cac:AllowanceCharge>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="SAR">0.6</cbc:TaxAmount>
+    </cac:TaxTotal>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="SAR">0.6</cbc:TaxAmount>
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="SAR">4.00</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="SAR">0.60</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:ID schemeID="UN/ECE 5305" schemeAgencyID="6">S</cbc:ID>
+                <cbc:Percent>15.00</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID schemeID="UN/ECE 5153" schemeAgencyID="6">VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="SAR">4.00</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="SAR">4.00</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="SAR">4.60</cbc:TaxInclusiveAmount>
+        <cbc:AllowanceTotalAmount currencyID="SAR">0.00</cbc:AllowanceTotalAmount>
+        <cbc:PrepaidAmount currencyID="SAR">0.00</cbc:PrepaidAmount>
+        <cbc:PayableAmount currencyID="SAR">4.60</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
     <cac:InvoiceLine>
         <cbc:ID>1</cbc:ID>
         <cbc:InvoicedQuantity unitCode="PCE">2.000000</cbc:InvoicedQuantity>
-        <cbc:LineExtensionAmount currencyID="SDG">3000.00</cbc:LineExtensionAmount>
+        <cbc:LineExtensionAmount currencyID="SAR">4.00</cbc:LineExtensionAmount>
         <cac:TaxTotal>
-            <cbc:TaxAmount currencyID="SDG">450.00</cbc:TaxAmount>
+            <cbc:TaxAmount currencyID="SAR">0.20</cbc:TaxAmount>
+            <cbc:RoundingAmount currencyID="SAR">4.60</cbc:RoundingAmount>
         </cac:TaxTotal>
         <cac:Item>
-            <cbc:Name>Laptop</cbc:Name>
+            <cbc:Name>قلم</cbc:Name>
+            <cac:ClassifiedTaxCategory>
+                <cbc:ID>S</cbc:ID>
+                <cbc:Percent>15.00</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>VAT</cbc:ID>
+                </cac:TaxScheme>
+            </cac:ClassifiedTaxCategory>
         </cac:Item>
         <cac:Price>
-            <cbc:PriceAmount currencyID="SDG">1500.00</cbc:PriceAmount>
+            <cbc:PriceAmount currencyID="SAR">2.00</cbc:PriceAmount>
+            <cac:AllowanceCharge>
+                <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
+                <cbc:AllowanceChargeReason>discount</cbc:AllowanceChargeReason>
+                <cbc:Amount currencyID="SAR">0.00</cbc:Amount>
+            </cac:AllowanceCharge>
         </cac:Price>
     </cac:InvoiceLine>
-    <cac:TaxTotal>
-        <cbc:TaxAmount currencyID="SDG">450.00</cbc:TaxAmount>
-    </cac:TaxTotal>
-    <cac:LegalMonetaryTotal>
-        <cbc:LineExtensionAmount currencyID="SDG">3000.00</cbc:LineExtensionAmount>
-        <cbc:TaxInclusiveAmount currencyID="SDG">3450.00</cbc:TaxInclusiveAmount>
-        <cbc:PayableAmount currencyID="SDG">3450.00</cbc:PayableAmount>
-    </cac:LegalMonetaryTotal>
 </Invoice>
