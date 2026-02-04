@@ -75,7 +75,7 @@ async fn main() -> std::io::Result<()> {
         Err(e) => panic!("error in the reading of the crypto_config from env :{}", e),
     };
     let crypto_data = web::Data::new(crypto_config);
-    print!("this is just a silly change to see if again image build time is reasonable");
+    
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
