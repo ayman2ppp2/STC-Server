@@ -64,11 +64,18 @@ async fn main() -> std::io::Result<()> {
     let pool = PgPool::connect(&database_url)
         .await
         .unwrap_or_else(|_| panic!("Failed to connect to Postgres: {}", database_url));
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
+
     let crypto_config = match Crypto::from_env().await {
         Ok(crypto_config) => crypto_config,
         Err(e) => panic!("error in the reading of the crypto_config from env :{}", e),
     };
     let crypto_data = web::Data::new(crypto_config);
+    print!("this is just a silly change to see if again image build time is reasonable");
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))

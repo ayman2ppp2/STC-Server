@@ -1,44 +1,74 @@
-# Builder stage: compile Rust binary with dependencies
-FROM rust:bookworm AS builder
-# Install system libraries for bindgen, SQLx, libxml2, OpenSSL, etc.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential clang libclang-dev libxml2-dev pkg-config libssl-dev \
-    curl git ca-certificates \
- && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /usr/src/app
-
-# Cache Rust dependencies by building a dummy main first0.
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo 'fn main() {}' > src/main.rs
-RUN cargo build --release
-
-# Now copy the actual source code and build the real binary.
+# ------------------------------------------------------------------------------
+# Stage 1: Planner
+# ------------------------------------------------------------------------------
+FROM rust:bookworm AS planner
+WORKDIR /app
+RUN cargo install cargo-chef
 COPY . .
-# If using SQLx query macros, enable offline mode and prepare the query cache1.
-RUN cargo install sqlx-cli --version "^0.7" \
- && export SQLX_OFFLINE=true \
- && cargo sqlx prepare \
- && cargo build --release
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Final stage: smaller runtime image with debugging tools included
+# ------------------------------------------------------------------------------
+# Stage 2: Cacher (The Heavy Lifting)
+# ------------------------------------------------------------------------------
+FROM rust:bookworm AS cacher
+WORKDIR /app
+RUN cargo install cargo-chef
+# Install system build-deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang libclang-dev libxml2-dev pkg-config libssl-dev
+COPY --from=planner /app/recipe.json recipe.json
+# This is the layer that will stay cached for ~150s!
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# ------------------------------------------------------------------------------
+# Stage 3: Builder (The Fast Part)
+# ------------------------------------------------------------------------------
+FROM rust:bookworm AS builder
+WORKDIR /app
+COPY . .
+# Copy pre-compiled dependencies from cacher
+COPY --from=cacher /app/target target
+COPY --from=cacher /usr/local/cargo /usr/local/cargo
+
+# Install system build-deps
+# OPTIMIZATION: Cache apt downloads and lists
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    clang libclang-dev libxml2-dev pkg-config libssl-dev
+# Build only your app code (should take < 10-20s)
+ENV SQLX_OFFLINE=true
+ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
+RUN cargo build --release --bin stc-server
+# ------------------------------------------------------------------------------
+# Stage 4: Runtime
+# ------------------------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
-# Expose the application port (set via PORT env; Render auto-detects it)2.
-ENV PORT 8000
+
+# 4. SECURITY: Create a non-root user
+RUN useradd -ms /bin/bash appuser
+
 WORKDIR /app
 
-# Install runtime libraries: SSL (for openssl crate), libpq, libxml2, etc.
-# Also install gdb for debugging (remove later if slimming).
+# 5. RUNTIME DEPS (CLEANED)
+# Removed: libclang-dev, gdb (save for debugging), build tools.
+# Added: ca-certificates (for HTTPS), libxml2 (dynamic link).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3 libpq5 libxml2 libclang-dev curl ca-certificates gdb \
+    libssl3 libpq5 libxml2 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-# Set LIBCLANG_PATH so bindgen (libxml) can find the clang library3.
-ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
+# Copy the binary
+COPY --from=builder /app/target/release/stc-server /app/stc-server
 
-# Copy the compiled binary from the builder stage.
-COPY --from=builder /usr/src/app/target/release/stc-server /app
+# Change ownership to the non-root user
+RUN chown -R appuser:appuser /app
 
-# Expose port and set the default command (Render will route $PORT to this).
-EXPOSE $PORT
+# Switch to non-root user
+USER appuser
+
+# 6. CONFIGURATION
+ENV PORT=8000
+EXPOSE ${PORT}
+
+# 7. EXEC FORM (Better for signals)
 CMD ["./stc-server"]
