@@ -5,7 +5,7 @@ use openssl::{
 
 use crate::config::crypto_config::Crypto;
 
-pub async fn sign_csr(req: X509Req, crypto: &Crypto) -> Result<X509, openssl::error::ErrorStack> {
+pub async fn sign_csr(req: &X509Req, crypto: &Crypto) -> Result<X509, openssl::error::ErrorStack> {
     // let pubkey = req.public_key()?;
 
     let mut builder = X509Builder::new()?;
