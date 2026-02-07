@@ -1,3 +1,4 @@
+use crate::models::enrollment_dto::IntermediateEnrollDto;
 use crate::services::signer::sign_csr;
 use crate::{config::crypto_config::Crypto, models::enrollment_dto::EnrollDTO};
 use anyhow::{Context, anyhow};
@@ -5,20 +6,21 @@ use anyhow::{Context, anyhow};
 use openssl::hash::hash;
 use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
 
-pub async fn handle_enrollment(dto: &EnrollDTO, crypto: &Crypto) -> Result<String, String> {
-    let intermediate = dto.parse().await?;
-    let pubkey = &intermediate
+pub async fn handle_enrollment(intermediate_dto: &IntermediateEnrollDto, crypto: &Crypto) -> Result<String, String> {
+    
+    
+    let pubkey = &intermediate_dto
         .csr
         .public_key()
         .map_err(|e| format!("error exracting the public key :{}", e))?;
-    if !intermediate
+    if !intermediate_dto
         .csr
         .verify(pubkey)
         .map_err(|e| format!("invalid CSR : {}", e))?
     {
         return Err("CSR verficiation failed".to_string());
     }
-    let certificate = sign_csr(intermediate.csr, crypto).await.map_err(|e| {
+    let certificate = sign_csr(&intermediate_dto.csr, crypto).await.map_err(|e| {
         format!(
             "an error with the creation and signing of the certificate :{}",
             e
