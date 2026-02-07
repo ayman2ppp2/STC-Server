@@ -1,143 +1,161 @@
-use anyhow::anyhow;
+
 use quick_xml::{Reader, Writer, events::Event};
 use std::io::Cursor;
+
+
+#[derive(PartialEq)]
+enum State {
+    Default,
+    Skipping,
+    InAdditionalDocRef,
+    InAdditionalDocRefId,
+}
+
 pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
-    // Remove XML declaration if present
-    let raw_xml = if raw_xml.starts_with(b"<?xml") {
-        let start = raw_xml
-            .iter()
-            .position(|&b| b == b'>')
-            .ok_or(anyhow!("Invalid XML header"))?
-            + 1;
-        &raw_xml[start..]
+    // 1. Remove XML declaration if present
+    let xml_to_parse = if raw_xml.starts_with(b"<?xml") {
+        let pos = raw_xml.iter().position(|&b| b == b'>').ok_or_else(|| anyhow::anyhow!("Invalid XML"))?;
+        &raw_xml[pos + 1..]
     } else {
         raw_xml
     };
 
-    let mut reader = Reader::from_reader(Cursor::new(raw_xml));
+    let mut reader = Reader::from_reader(Cursor::new(xml_to_parse));
     let mut writer = Writer::new(Vec::new());
+    let mut adr_buffer: Vec<u8> = Vec::new(); 
+    
+    let mut state = State::Default;
+    let mut skip_depth = 0;
+    let mut adr_depth = 0;
+    let mut is_qr_reference = false;
     let mut buf = Vec::new();
-
-    let mut skip_depth = 0usize;
-
-    let mut adr_depth = 0usize;
-    let mut adr_has_qr = false;
-    let mut in_adr_id = false;
-    let mut adr_writer = Writer::new(Vec::new());
 
     loop {
         match reader.read_event_into(&mut buf) {
-            /* ---------- START ---------- */
             Ok(Event::Start(e)) => {
-                if skip_depth > 0 {
-                    skip_depth += 1;
-                } else if e.local_name().as_ref() == b"UBLExtensions"
-                    || e.local_name().as_ref() == b"Signature"
-                {
-                    skip_depth = 1;
-                } else if e.local_name().as_ref() == b"AdditionalDocumentReference" {
-                    adr_depth = 1;
-                    adr_has_qr = false;
-                    in_adr_id = false;
-                    adr_writer = Writer::new(Vec::new());
-                    adr_writer.write_event(Event::Start(e.to_owned()))?;
-                } else if adr_depth > 0 {
-                    adr_depth += 1;
-                    if e.local_name().as_ref() == b"bID" {
-                        in_adr_id = true;
+                let local_name = e.local_name();
+                let tag_bytes = local_name.as_ref();
+
+                match state {
+                    State::Skipping => {
+                        skip_depth += 1;
                     }
-                    adr_writer.write_event(Event::Start(e.to_owned()))?;
-                } else {
-                    writer.write_event(Event::Start(e.to_owned()))?;
+                    State::Default => {
+                        if tag_bytes == b"UBLExtensions" || tag_bytes == b"Signature" {
+                            state = State::Skipping;
+                            skip_depth = 1;
+                        } else if tag_bytes == b"AdditionalDocumentReference" {
+                            state = State::InAdditionalDocRef;
+                            adr_depth = 1;
+                            is_qr_reference = false;
+                            adr_buffer.clear();
+                            // In latest quick-xml, Event implements AsRef<[u8]>
+                            // We wrap in < > because as_ref() on Start event usually 
+                            // contains the tag content without the brackets.
+                            adr_buffer.push(b'<');
+                            adr_buffer.extend_from_slice(e.as_ref());
+                            adr_buffer.push(b'>');
+                        } else {
+                            writer.write_event(Event::Start(e))?;
+                        }
+                    }
+                    State::InAdditionalDocRef | State::InAdditionalDocRefId => {
+                        adr_depth += 1;
+                        if tag_bytes == b"ID" && state == State::InAdditionalDocRef {
+                            state = State::InAdditionalDocRefId;
+                        }
+                        adr_buffer.push(b'<');
+                        adr_buffer.extend_from_slice(e.as_ref());
+                        adr_buffer.push(b'>');
+                    }
                 }
             }
 
-            /* ---------- END ---------- */
-            Ok(Event::End(e)) => {
-                if skip_depth > 0 {
-                    skip_depth -= 1;
-                } else if adr_depth > 0 {
-                    if e.local_name().as_ref() == b"ID" {
-                        in_adr_id = false;
+            Ok(Event::Text(e)) => {
+                match state {
+                    State::Skipping => {}
+                    State::InAdditionalDocRefId => {
+                        // Check if the unescaped content is exactly "QR"
+                        if e.as_ref().trim_ascii() == b"QR" {
+                            is_qr_reference = true;
+                        }
+                        adr_buffer.extend_from_slice(e.as_ref());
                     }
+                    State::InAdditionalDocRef => {
+                        adr_buffer.extend_from_slice(e.as_ref());
+                    }
+                    State::Default => {
+                        writer.write_event(Event::Text(e))?;
+                    }
+                }
+            }
 
-                    adr_depth -= 1;
-                    adr_writer.write_event(Event::End(e.to_owned()))?;
+            Ok(Event::End(e)) => {
+                
 
-                    if adr_depth == 0 && !adr_has_qr {
-                        let bytes = adr_writer.into_inner();
-                        let mut r = Reader::from_reader(Cursor::new(bytes));
-                        let mut b = Vec::new();
-
-                        loop {
-                            match r.read_event_into(&mut b) {
-                                Ok(Event::Eof) => break,
-                                Ok(ev) => writer.write_event(ev)?,
-                                Err(e) => return Err(e.into()),
-                            }
-                            b.clear();
+                match state {
+                    State::Skipping => {
+                        skip_depth -= 1;
+                        if skip_depth == 0 { state = State::Default; }
+                    }
+                    State::InAdditionalDocRefId | State::InAdditionalDocRef => {
+                        adr_depth -= 1;
+                        adr_buffer.extend_from_slice(b"</");
+                        adr_buffer.extend_from_slice(e.as_ref());
+                        adr_buffer.push(b'>');
+                        
+                        if state == State::InAdditionalDocRefId {
+                            state = State::InAdditionalDocRef;
                         }
 
-                        // Reinitialize adr_writer after consuming it
-                        adr_writer = Writer::new(Vec::new());
+                        if adr_depth == 0 {
+                            if !is_qr_reference {
+                                writer.get_mut().extend_from_slice(&adr_buffer);
+                            }
+                            state = State::Default;
+                        }
                     }
-                } else {
-                    writer.write_event(Event::End(e.to_owned()))?;
+                    State::Default => {
+                        writer.write_event(Event::End(e))?;
+                    }
                 }
             }
 
-            /* ---------- EMPTY ---------- */
             Ok(Event::Empty(e)) => {
-                if e.local_name().as_ref() == b"UBLExtensions"
-                    || e.local_name().as_ref() == b"Signature"
-                {
-                    // skip
-                } else if adr_depth > 0 {
-                    adr_writer.write_event(Event::Empty(e.to_owned()))?;
-                } else {
-                    writer.write_event(Event::Empty(e.to_owned()))?;
-                }
-            }
 
-            /* ---------- TEXT ---------- */
-            Ok(Event::Text(e)) => {
-                let text = std::str::from_utf8(e.as_ref())?.trim();
-
-                if adr_depth > 0 && in_adr_id && text == "QR" {
-                    adr_has_qr = true;
-                }
-
-                if skip_depth == 0 {
-                    if adr_depth > 0 {
-                        adr_writer.write_event(Event::Text(e.to_owned()))?;
-                    } else {
-                        writer.write_event(Event::Text(e.to_owned()))?;
+                match state {
+                    State::Skipping => {}
+                    State::Default => {
+                        if  e.local_name().as_ref() != b"UBLExtensions" &&  e.local_name().as_ref() != b"Signature" {
+                            writer.write_event(Event::Empty(e))?;
+                        }
+                    }
+                    _ => {
+                        adr_buffer.push(b'<');
+                        adr_buffer.extend_from_slice(e.as_ref());
+                        adr_buffer.extend_from_slice(b"/>");
                     }
                 }
             }
 
-            /* ---------- OTHER ---------- */
             Ok(Event::Eof) => break,
-
+            
+            // Handle CData, Comments, Decl, PI explicitly to ensure byte-fidelity
             Ok(ev) => {
-                if skip_depth == 0 {
-                    if adr_depth > 0 {
-                        adr_writer.write_event(ev.to_owned())?;
-                    } else {
-                        writer.write_event(ev.to_owned())?;
-                    }
+                match state {
+                    State::Default => { writer.write_event(ev)?; },
+                    State::Skipping => {},
+                    _ => { adr_buffer.extend_from_slice(ev.as_ref()); }
                 }
             }
-
             Err(e) => return Err(e.into()),
         }
-
         buf.clear();
     }
-
-    let cleaned_xml = writer.into_inner();
-    Ok(cleaned_xml)
+    
+    Ok(writer.into_inner())
 }
+
 pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(true);
