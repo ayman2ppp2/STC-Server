@@ -24,13 +24,13 @@ pub async fn submit_invoice(
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    
+
     let intermidate_dto = invoice_dto
         .into_inner()
         .parse()
         .map_err(actix_web::error::ErrorForbidden)?;
     // compare hash
-    
+
     let received_hash = &intermidate_dto.invoice_hash;
     let hash = compute_hash(&intermidate_dto.canonicalized_invoice_bytes)
         .map_err(actix_web::error::ErrorBadRequest)?;
@@ -70,19 +70,19 @@ pub async fn submit_invoice(
             validation_status: ValidationStatus::Pass,
         },
     }))
-    
+
 }
 async fn save_invoice(pool: &PgPool, invoiceb64: &String, uuid: &Uuid, hash: Vec<u8>, company: String) -> anyhow::Result<(), sqlx::Error> {
     sqlx::query!(
     "
-    INSERT INTO invoices (invoiceb64, uuid, hash, company) 
+    INSERT INTO invoices (invoiceb64, uuid, hash, company)
     VALUES ($1, $2, $3, $4)
     ",
     invoiceb64,
     uuid,
     hash,
     company,
-    
+
 )
 .execute(pool)
 .await?;
