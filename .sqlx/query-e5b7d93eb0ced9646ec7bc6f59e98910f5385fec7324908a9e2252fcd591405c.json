@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO csr_challenges (token_hash,company_id)\n        VALUES($1,$2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e5b7d93eb0ced9646ec7bc6f59e98910f5385fec7324908a9e2252fcd591405c"
+}
