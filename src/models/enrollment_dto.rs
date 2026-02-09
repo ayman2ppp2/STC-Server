@@ -2,6 +2,7 @@ use anyhow::{Context, anyhow};
 use openssl::{nid::Nid, x509::X509Req};
 #[derive(serde::Deserialize)]
 pub struct EnrollDTO {
+    pub token :String,
     pub csr: String,
 }
 
@@ -12,18 +13,16 @@ pub struct EnrollResponse {
 }
 
 pub struct IntermediateEnrollDto {
+    pub token : String,
     pub csr: X509Req,
 }
 
 impl EnrollDTO {
     pub fn parse(&self) -> Result<IntermediateEnrollDto, String> {
-        // let certificate_bytes = general_purpose::STANDARD.decode(& self.csr).map_err(|_|
-        //   "the certificate request is not valid base64"
-        // )?;
-
         let csr = X509Req::from_pem(self.csr.as_bytes())
             .map_err(|e| format!("Failed to parse the certificate request : {}", e))?;
-        Ok(IntermediateEnrollDto { csr })
+        let token = self.token.to_owned();
+        Ok(IntermediateEnrollDto { token,csr })
     }
 }
 impl IntermediateEnrollDto {
@@ -32,7 +31,7 @@ impl IntermediateEnrollDto {
         // If your Company ID is in the "Serial Number" field, change Nid::COMMON_NAME to Nid::SERIAL_NUMBER
         let entry = self.csr
             .subject_name()
-            .entries_by_nid(Nid::SERIALNUMBER) 
+            .entries_by_nid(Nid::SERIALNUMBER)
             .next()
             .ok_or_else(|| anyhow!("CSR is missing the Serial Number (Company ID)"))?;
 

@@ -5,3 +5,4 @@ canon.xml
 test.xml
 response.json
 .vscode/launch.json
+.env
