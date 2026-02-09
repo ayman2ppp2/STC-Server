@@ -5,8 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-  # Enables the "Run workflow" button in the Actions tab
-  workflow_dispatch:
+  workflow_dispatch: # Manual trigger
 
 jobs:
   build:
@@ -19,24 +18,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: my-image-name
-          tags: |
-            type=sha,format=long
-            type=ref,event=branch
-            latest
-        env:
-          # Adding the token helps prevent throttling/rate-limiting
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
+          # 'push: false' means it just tests the build process
           push: false 
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: my-app:test
+          # Using 'type=docker' ensures the image is loaded into the local 
+          # runner's docker daemon for validation
+          outputs: type=docker,dest=/tmp/my-image.tar
