@@ -6,3 +6,4 @@ test.xml
 response.json
 .vscode/launch.json
 .env
+request.csr

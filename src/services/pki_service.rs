@@ -1,14 +1,14 @@
 use crate::models::enrollment_dto::IntermediateEnrollDto;
 use crate::services::signer::sign_csr;
-use crate::{config::crypto_config::Crypto, models::enrollment_dto::EnrollDTO};
+use crate::config::crypto_config::Crypto;
 use anyhow::{Context, anyhow};
 
 use openssl::hash::hash;
 use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
 
 pub async fn handle_enrollment(intermediate_dto: &IntermediateEnrollDto, crypto: &Crypto) -> Result<String, String> {
-    
-    
+
+
     let pubkey = &intermediate_dto
         .csr
         .public_key()

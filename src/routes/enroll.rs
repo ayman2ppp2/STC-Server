@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use crate::{
     config::crypto_config::Crypto,
     models::enrollment_dto::{EnrollDTO, EnrollResponse},
-    services::{extractors::extract_company_id, pki_service::handle_enrollment},
+    services::pki_service::handle_enrollment,
 };
 
 pub async fn enroll(
@@ -41,7 +41,7 @@ pub async fn enroll(
     // compare the received token hash with the fetched token hash,
     match fetched_token {
         Some(token) => {
-            if !memcmp::eq(intermediate_dto.token.as_bytes(), &token.token_hash) {
+            if !memcmp::eq(&intermediate_dto.token, &token.token_hash) {
                 return Err(actix_web::error::ErrorBadRequest("token hash mismatch"));
             }
             // if valid handle the enrollment otherwise , return an invalid token error,
