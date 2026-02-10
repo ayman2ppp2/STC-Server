@@ -1,8 +1,6 @@
 name: Docker Image CI
 
 on:
-  push:
-    branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
   workflow_dispatch: # Manual trigger
@@ -24,8 +22,8 @@ jobs:
           context: .
           file: ./Dockerfile
           # 'push: false' means it just tests the build process
-          push: false 
+          push: false
           tags: my-app:test
-          # Using 'type=docker' ensures the image is loaded into the local 
+          # Using 'type=docker' ensures the image is loaded into the local
           # runner's docker daemon for validation
           outputs: type=docker,dest=/tmp/my-image.tar
