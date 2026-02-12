@@ -1,7 +1,6 @@
-
+use anyhow::Context;
 use quick_xml::{Reader, Writer, events::Event};
 use std::io::Cursor;
-
 
 #[derive(PartialEq)]
 enum State {
@@ -14,7 +13,10 @@ enum State {
 pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     // 1. Remove XML declaration if present
     let xml_to_parse = if raw_xml.starts_with(b"<?xml") {
-        let pos = raw_xml.iter().position(|&b| b == b'>').ok_or_else(|| anyhow::anyhow!("Invalid XML"))?;
+        let pos = raw_xml
+            .iter()
+            .position(|&b| b == b'>')
+            .ok_or_else(|| anyhow::anyhow!("Invalid XML"))?;
         &raw_xml[pos + 1..]
     } else {
         raw_xml
@@ -22,8 +24,8 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
 
     let mut reader = Reader::from_reader(Cursor::new(xml_to_parse));
     let mut writer = Writer::new(Vec::new());
-    let mut adr_buffer: Vec<u8> = Vec::new(); 
-    
+    let mut adr_buffer: Vec<u8> = Vec::new();
+
     let mut state = State::Default;
     let mut skip_depth = 0;
     let mut adr_depth = 0;
@@ -50,7 +52,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                             is_qr_reference = false;
                             adr_buffer.clear();
                             // In latest quick-xml, Event implements AsRef<[u8]>
-                            // We wrap in < > because as_ref() on Start event usually 
+                            // We wrap in < > because as_ref() on Start event usually
                             // contains the tag content without the brackets.
                             adr_buffer.push(b'<');
                             adr_buffer.extend_from_slice(e.as_ref());
@@ -90,69 +92,68 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                 }
             }
 
-            Ok(Event::End(e)) => {
-                
-
-                match state {
-                    State::Skipping => {
-                        skip_depth -= 1;
-                        if skip_depth == 0 { state = State::Default; }
-                    }
-                    State::InAdditionalDocRefId | State::InAdditionalDocRef => {
-                        adr_depth -= 1;
-                        adr_buffer.extend_from_slice(b"</");
-                        adr_buffer.extend_from_slice(e.as_ref());
-                        adr_buffer.push(b'>');
-                        
-                        if state == State::InAdditionalDocRefId {
-                            state = State::InAdditionalDocRef;
-                        }
-
-                        if adr_depth == 0 {
-                            if !is_qr_reference {
-                                writer.get_mut().extend_from_slice(&adr_buffer);
-                            }
-                            state = State::Default;
-                        }
-                    }
-                    State::Default => {
-                        writer.write_event(Event::End(e))?;
+            Ok(Event::End(e)) => match state {
+                State::Skipping => {
+                    skip_depth -= 1;
+                    if skip_depth == 0 {
+                        state = State::Default;
                     }
                 }
-            }
+                State::InAdditionalDocRefId | State::InAdditionalDocRef => {
+                    adr_depth -= 1;
+                    adr_buffer.extend_from_slice(b"</");
+                    adr_buffer.extend_from_slice(e.as_ref());
+                    adr_buffer.push(b'>');
 
-            Ok(Event::Empty(e)) => {
-
-                match state {
-                    State::Skipping => {}
-                    State::Default => {
-                        if  e.local_name().as_ref() != b"UBLExtensions" &&  e.local_name().as_ref() != b"Signature" {
-                            writer.write_event(Event::Empty(e))?;
-                        }
+                    if state == State::InAdditionalDocRefId {
+                        state = State::InAdditionalDocRef;
                     }
-                    _ => {
-                        adr_buffer.push(b'<');
-                        adr_buffer.extend_from_slice(e.as_ref());
-                        adr_buffer.extend_from_slice(b"/>");
+
+                    if adr_depth == 0 {
+                        if !is_qr_reference {
+                            writer.get_mut().extend_from_slice(&adr_buffer);
+                        }
+                        state = State::Default;
                     }
                 }
-            }
+                State::Default => {
+                    writer.write_event(Event::End(e))?;
+                }
+            },
+
+            Ok(Event::Empty(e)) => match state {
+                State::Skipping => {}
+                State::Default => {
+                    if e.local_name().as_ref() != b"UBLExtensions"
+                        && e.local_name().as_ref() != b"Signature"
+                    {
+                        writer.write_event(Event::Empty(e))?;
+                    }
+                }
+                _ => {
+                    adr_buffer.push(b'<');
+                    adr_buffer.extend_from_slice(e.as_ref());
+                    adr_buffer.extend_from_slice(b"/>");
+                }
+            },
 
             Ok(Event::Eof) => break,
-            
+
             // Handle CData, Comments, Decl, PI explicitly to ensure byte-fidelity
-            Ok(ev) => {
-                match state {
-                    State::Default => { writer.write_event(ev)?; },
-                    State::Skipping => {},
-                    _ => { adr_buffer.extend_from_slice(ev.as_ref()); }
+            Ok(ev) => match state {
+                State::Default => {
+                    writer.write_event(ev)?;
                 }
-            }
+                State::Skipping => {}
+                _ => {
+                    adr_buffer.extend_from_slice(ev.as_ref());
+                }
+            },
             Err(e) => return Err(e.into()),
         }
         buf.clear();
     }
-    
+
     Ok(writer.into_inner())
 }
 
@@ -279,7 +280,9 @@ pub fn extract_company_id(invoice: &[u8]) -> anyhow::Result<String> {
 
             Ok(Event::Text(e)) => {
                 if in_accounting_customer_party {
-                    let text = e.decode().expect("failed to decode the xml");
+                    let text = e
+                        .decode()
+                        .context("failed to read the company id from invoice")?;
                     if current == 1 {
                         company_id.push_str(&text)
                     }
@@ -296,13 +299,108 @@ pub fn extract_company_id(invoice: &[u8]) -> anyhow::Result<String> {
 
     Ok(company_id)
 }
+
+#[derive(Debug, PartialEq)]
+enum PihState {
+    Searching,     // Looking for AdditionalDocumentReference
+    InsideDocRef,  // Inside AdditionalDocumentReference, looking for ID
+    FoundPihBlock, // Confirmed this is the PIH block, looking for DigestValue
+}
+
+pub fn extract_pih(invoice: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut reader = Reader::from_reader(Cursor::new(invoice));
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::with_capacity(1024);
+    let mut state = PihState::Searching;
+    let mut current_tag = String::new();
+    let mut pih_hash = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = e.local_name();
+                let tag = std::str::from_utf8(name.as_ref())?;
+                current_tag = tag.to_string();
+
+                if tag == "ID" {
+                    state = PihState::InsideDocRef;
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                let text = e.decode().context("failed to read the PIH from invoice")?;
+
+                match state {
+                    PihState::InsideDocRef => {
+                        // We are inside a DocRef, checking if this is the "PIH" one
+                        if current_tag == "ID" && text == "PIH" {
+                            state = PihState::FoundPihBlock;
+                        }
+                    }
+                    PihState::FoundPihBlock => {
+                        // We confirmed we are in PIH, now look for the digest
+                        if current_tag == "EmbeddedDocumentBinaryObject" {
+                            pih_hash = text.into_owned();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            Ok(Event::End(e)) => {
+                let tag = e.local_name();
+                if tag.as_ref() == b"AdditionalDocumentReference" {
+                    // If we found the hash, we're done.
+                    // If not, reset to search for the next DocRef (e.g., the QR one)
+                    if !pih_hash.is_empty() {
+                        break;
+                    }
+                    state = PihState::Searching;
+                }
+                current_tag.clear();
+            }
+
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(anyhow::anyhow!("XML error: {e}")),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    if pih_hash.is_empty() {
+        return Err(anyhow::anyhow!("PIH DigestValue not found in valid block"));
+    }
+
+    Ok(pih_hash.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
+    fn test_extract_pih() {
+        let xml = br#"<cac:AdditionalDocumentReference>
+        <cbc:ID>ICV</cbc:ID>
+        <cbc:UUID>23</cbc:UUID>
+    </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>PIH</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>QR</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">AW/YtNix2YPYqSDYqtmI2LHZitivINin2YTYqtmD2YbZiNmE2YjYrNmK2Kcg2KjYo9mC2LXZiSDYs9ix2LnYqSDYp9mE2YXYrdiv2YjYr9ipIHwgTWF4aW11bSBTcGVlZCBUZWNoIFN1cHBseSBMVEQCDzM5OTk5OTk5OTkwMDAwMwMTMjAyMi0wOS0wN1QxMjoyMToyOAQENC42MAUDMC42BixmKzBXQ3FuUGtJbkkrZUw5RzNMQXJ5MTJmVFBmK3RvQzlVWDA3RjRmSStzPQdgTUVVQ0lCeHlSOHJjNEs4NzI4d2RTRjRYU0RxUHMrcklMKzNURmg5bSthTnhRUHRTQWlFQTZjSGFwSXR2cDEzeU1TdTY2TmJPZzJDcG9tSHdVU25ZSjloNnVHUTY1YVk9CFgwVjAQBgcqhkjOPQIBBgUrgQQACgNCAAShYIprRJr0UgStM6/S4CQLVUgpfFT2c+nHa+V/jKEx6PLxzTZcluUOru0/J2jyarRqE4yY2jyDCeLte3UpP1R4</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>"#;
+        assert_eq!(extract_pih(xml).expect("shit happend in the test"),b"NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==");
+    }
+    #[test]
     fn test_extract_company_id() {
-        let xml = 
-        br#"<cac:AccountingSupplierParty>
+        let xml = br#"<cac:AccountingSupplierParty>
         <cac:Party>
             <cac:PartyIdentification>
                 <cbc:ID schemeID="CRN">1010010000</cbc:ID>
