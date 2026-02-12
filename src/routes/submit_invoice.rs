@@ -16,6 +16,7 @@ use crate::{
     services::{
         clear_invoice::clear_invoice,
         pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert},
+        verify_pih::verify_pih,
     },
 };
 
@@ -24,7 +25,6 @@ pub async fn submit_invoice(
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
-
     let intermidate_dto = invoice_dto
         .into_inner()
         .parse()
@@ -37,6 +37,16 @@ pub async fn submit_invoice(
     if !memcmp::eq(received_hash, &hash) {
         return Err(actix_web::error::ErrorNotAcceptable("hash mismatch"));
     }
+
+    // verify PIH
+    verify_pih(
+        &intermidate_dto.invoice_bytes,
+        &db_pool,
+        &intermidate_dto.company,
+    )
+    .await
+    .map_err(actix_web::error::ErrorNotAcceptable)?;
+
     // verify the certificate
     verify_cert_with_ca(&crypto.get_ref().certificate, &intermidate_dto.certificate)
         .await
@@ -50,9 +60,17 @@ pub async fn submit_invoice(
     .await
     .map_err(actix_web::error::ErrorBadRequest)?;
 
-    let (hash,cleared_invoice,) = clear_invoice(&intermidate_dto, &crypto)
+    let (hash, cleared_invoice) = clear_invoice(&intermidate_dto, &crypto)
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    save_invoice(&db_pool, &cleared_invoice, &intermidate_dto.uuid, hash, intermidate_dto.company).await.map_err(actix_web::error::ErrorInternalServerError)?;
+    save_invoice(
+        &db_pool,
+        &cleared_invoice,
+        &intermidate_dto.uuid,
+        hash,
+        intermidate_dto.company,
+    )
+    .await
+    .map_err(actix_web::error::ErrorInternalServerError)?;
     Ok(HttpResponse::Ok().json(SubmitInvoiceResponse {
         clearence_status: ClearenceStatus::Cleared,
         cleared_invoice,
@@ -70,21 +88,25 @@ pub async fn submit_invoice(
             validation_status: ValidationStatus::Pass,
         },
     }))
-
 }
-async fn save_invoice(pool: &PgPool, invoiceb64: &String, uuid: &Uuid, hash: Vec<u8>, company: String) -> anyhow::Result<(), sqlx::Error> {
+async fn save_invoice(
+    pool: &PgPool,
+    invoiceb64: &String,
+    uuid: &Uuid,
+    hash: Vec<u8>,
+    company: String,
+) -> anyhow::Result<(), sqlx::Error> {
     sqlx::query!(
-    "
+        "
     INSERT INTO invoices (invoiceb64, uuid, hash, company)
     VALUES ($1, $2, $3, $4)
     ",
-    invoiceb64,
-    uuid,
-    hash,
-    company,
-
-)
-.execute(pool)
-.await?;
+        invoiceb64,
+        uuid,
+        hash,
+        company,
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }

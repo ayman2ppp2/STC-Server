@@ -65,10 +65,10 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|_| panic!("Failed to connect to Postgres: {}", database_url));
 
-    // sqlx::migrate!("./migrations")
-    //     .run(&pool)
-    //     .await
-    //     .expect("Failed to run migrations");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
 
     let crypto_config = match Crypto::from_env().await {
         Ok(crypto_config) => crypto_config,

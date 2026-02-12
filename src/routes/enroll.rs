@@ -59,6 +59,6 @@ pub async fn enroll(
                 }))),
             }
         }
-        None =>  Err(actix_web::error::ErrorBadRequest("no valid token found")),
+        None => Err(actix_web::error::ErrorBadRequest("no valid token found")),
     }
 }
