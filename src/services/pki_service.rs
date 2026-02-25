@@ -49,7 +49,7 @@ pub async fn verify_cert_with_ca(ca_crt: &X509, client_crt: &X509) -> anyhow::Re
     Ok(client_crt.verify(&ca_pub_key)?)
 }
 
-pub async fn verify_signature_with_cert(
+pub fn verify_signature_with_cert(
     recv_hash: &[u8],
     sig: &[u8],
     crt: &X509,

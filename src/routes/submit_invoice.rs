@@ -57,7 +57,7 @@ pub async fn submit_invoice(
         &intermidate_dto.invoice_signature,
         &intermidate_dto.certificate,
     )
-    .await
+    
     .map_err(actix_web::error::ErrorBadRequest)?;
 
     let (hash, cleared_invoice) = clear_invoice(&intermidate_dto, &crypto)
