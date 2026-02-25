@@ -5,3 +5,5 @@ pub mod extractors;
 pub mod c14n11;
 pub mod clear_invoice;
 pub mod verify_pih;
+pub mod edit_tlv;
+pub mod verify_qr;

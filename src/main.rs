@@ -1,4 +1,4 @@
-use crate::routes::{enroll::enroll, on_boarding::on_board, token_generator::token_generator};
+use crate::routes::{enroll::enroll, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
@@ -87,6 +87,7 @@ async fn main() -> std::io::Result<()> {
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))
             .route("/get_invoices", web::get().to(get_invoices))
+            .route("/verify_qr", web::post().to(verify_qr))
     })
     .bind(("0.0.0.0", port))?
     .run()
