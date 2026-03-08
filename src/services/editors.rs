@@ -4,6 +4,8 @@ use quick_xml::events::{BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::io::Cursor;
 
+use crate::services::edit_tlv::edit_tlv;
+
 /*
 1. Canonicalize invoice → hash invoice
 2. Build SignedProperties
@@ -77,7 +79,7 @@ pub fn edit_signing_time(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                 writer.write_event(ev.to_owned())?;
             }
 
-            Err(e) => return Err(anyhow!(format!("XML parse error : {}",e))),
+            Err(e) => return Err(anyhow!(format!("XML parse error : {}", e))),
         }
 
         buf.clear();
@@ -137,8 +139,6 @@ pub fn edit_signed_info(
             }
 
             Event::End(e) => {
-               
-
                 if e.local_name().as_ref() == b"Reference" {
                     active_ref = ActiveReference::Other;
                 }
@@ -251,9 +251,92 @@ pub fn edit_signature(xml: &[u8], signature: String) -> anyhow::Result<Vec<u8>> 
     Ok(writer.into_inner())
 }
 
-// pub fn edit_invoice(xml :&[u8]) -> anyhow::Result<Vec<u8>>{
-    
-// }
+// Helper to gracefully ignore XML namespaces (e.g., handles "cac:AdditionalDocumentReference" or "AdditionalDocumentReference")
+
+pub fn edit_qr(xml: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<Vec<u8>> {
+    // IMPORTANT: Do not configure reader.trim_text(true).
+    // We must preserve exact whitespaces for signature validity.
+    let mut reader = Reader::from_reader(Cursor::new(xml));
+    let mut writer = Writer::new(Vec::new());
+    let mut buf = Vec::new();
+
+    // State trackers
+    let mut in_additional_doc_ref = false;
+    let mut in_id_tag = false;
+    let mut is_qr_block = false;
+    let mut in_binary_object = false;
+
+    loop {
+        match reader.read_event_into(&mut buf)? {
+            Event::Start(e) => {
+                if e.local_name().as_ref() == b"AdditionalDocumentReference" {
+                    in_additional_doc_ref = true;
+                    is_qr_block = false; // Reset block state
+                }
+
+                if in_additional_doc_ref && e.local_name().as_ref() == b"ID" {
+                    in_id_tag = true;
+                }
+
+                if is_qr_block && e.local_name().as_ref() == b"EmbeddedDocumentBinaryObject" {
+                    in_binary_object = true;
+                }
+
+                writer.write_event(Event::Start(e.to_owned()))?;
+            }
+
+            Event::End(e) => {
+                if e.local_name().as_ref() == b"AdditionalDocumentReference" {
+                    in_additional_doc_ref = false;
+                    is_qr_block = false;
+                }
+
+                if e.local_name().as_ref() == b"ID" {
+                    in_id_tag = false;
+                }
+
+                if e.local_name().as_ref() == b"EmbeddedDocumentBinaryObject" {
+                    in_binary_object = false;
+                }
+
+                writer.write_event(Event::End(e.to_owned()))?;
+            }
+
+            Event::Text(e) => {
+                if in_id_tag {
+                    // Check if this AdditionalDocumentReference is specifically the "QR" one
+                    if e.as_ref() == b"QR" {
+                        is_qr_block = true;
+                    }
+                    writer.write_event(Event::Text(e.to_owned()))?;
+                } else if in_binary_object {
+                    // WE FOUND IT: Swap the old base64 text with the edited base64 text
+                    let e = edit_tlv(&e, hash, signature)?;
+                    writer.write_event(Event::Text(BytesText::new(&e)))?;
+                } else {
+                    // Pass all other text content through completely untouched
+                    writer.write_event(Event::Text(e.to_owned()))?;
+                }
+            }
+
+            Event::Empty(e) => {
+                // Safely pass through self-closing tags like <cbc:ID/>
+                writer.write_event(Event::Empty(e.to_owned()))?;
+            }
+
+            Event::Eof => break,
+
+            ev => {
+                // Pass through Comments, CData, Decl, PIs untouched
+                writer.write_event(ev.to_owned())?;
+            }
+        }
+
+        buf.clear();
+    }
+
+    Ok(writer.into_inner())
+}
 
 #[cfg(test)]
 mod tests {
@@ -293,12 +376,33 @@ mod tests {
     <Data>Some data</Data>
     <SigningTime>2023-10-01T12:00:00Z</SigningTime>
     <MoreData>Other data</MoreData>
-</Root>"#;
+    </Root>"#;
         let cleared = String::from_utf8(edit_signing_time(xml.as_bytes()).unwrap()).unwrap();
         assert!(cleared.contains("<Data>Some data</Data>"));
         assert!(cleared.contains("<MoreData>Other data</MoreData>"));
         assert!(!cleared.contains("2023-10-01T12:00:00Z")); // Old time should be gone
         assert!(cleared.contains("<SigningTime>")); // Tag should still be there
+    }
+
+    #[test]
+    fn test_edit_qr() {
+        let xml = br#"<cac:AdditionalDocumentReference>
+        <cbc:ID>PIH</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>QR</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">AW/YtNix2YPYqSDYqtmI2LHZitivINin2YTYqtmD2YbZiNmE2YjYrNmK2Kcg2KjYo9mC2LXZiSDYs9ix2LnYqSDYp9mE2YXYrdiv2YjYr9ipIHwgTWF4aW11bSBTcGVlZCBUZWNoIFN1cHBseSBMVEQCDzMxMDA5NDAxMDMwMDAwMwMTMjAyMi0wOS0wNVQxNjo1MDo0MAQENC42MAUDMC42BixrRS84Q2dEMHFYZUZnRHNPUVZzTzlWZXN2dUxhVjE5aFlUeGRteUpvYTg4PQdgTUVRQ0lCZ2ZtSXRhN2FPeU5ndVRaUXU1T3ZCUFh2M0E5blJsb3dzZjJSTnE5b3l6QWlCYno4a1ZMOWlIdEYwNTFiVmJUT3hrZzdIM3UybGcreDRSZDM3Q1VtNDV5QT09CFgwVjAQBgcqhkjOPQIBBgUrgQQACgNCAARqD+MJJBltQnk7fzrUgl4/N2CPcAeTPTAD7RatCimMjrul4UMQuWH4FrduVOCclWrFlDk8aJV2tAmRgUxbiNA5</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>"#;
+        let hash = [0u8; 9];
+        let signature = [0u8; 17];
+        let result = edit_qr(xml, &hash, &signature).unwrap();
+        //    dbg!("left : {}",String::from_utf8_lossy(&result));
+        assert_ne!(result, xml);
     }
 
     // Comprehensive edit_signing_time test using real invoice XML
@@ -416,67 +520,13 @@ mod tests {
         assert!(!result_str.contains("2024-01-14T10:21:40"));
 
         // Verify XML structure is preserved
-        assert!(result_str.contains("<cbc:ID>SME00023</cbc:ID>"));
-        assert!(result_str.contains("<cbc:IssueDate>2022-09-07</cbc:IssueDate>"));
+        assert!(result_str.contains("<cbc:ID>SME00015</cbc:ID>"));
+        assert!(result_str.contains("<cbc:IssueDate>2022-09-05</cbc:IssueDate>"));
         assert!(result_str.contains("<xades:SignedProperties"));
         assert!(result_str.contains("<ds:SignedInfo>"));
     }
 
     // Legacy simple tests (preserved for backward compatibility)
-    #[test]
-    fn test_edit_signed_info_invoice_hash_replacement() {
-        let xml = r#"<Root><Reference Id="invoiceSignedData"><DigestValue>oldInvoiceHash</DigestValue></Reference></Root>"#;
-        let result = String::from_utf8(
-            edit_signed_info(xml.as_bytes(), b"newInvoiceHash", b"propHash").unwrap()
-        ).unwrap();
-        assert!(!result.contains("oldInvoiceHash"));
-        assert!(result.contains("newInvoiceHash"));
-    }
-
-    #[test]
-    fn test_edit_signed_info_signed_properties_hash_replacement() {
-        let xml = r#"<Root><Reference Type="http://www.w3.org/2000/09/xmldsig#SignatureProperties"><DigestValue>oldPropHash</DigestValue></Reference></Root>"#;
-        let result = String::from_utf8(
-            edit_signed_info(xml.as_bytes(), b"invHash", b"newPropHash").unwrap()
-        ).unwrap();
-        assert!(!result.contains("oldPropHash"));
-        assert!(result.contains("newPropHash"));
-    }
-
-    #[test]
-    fn test_edit_signed_info_preserves_other_digests() {
-        let xml = r#"<Root><Reference><DigestValue>otherHash</DigestValue></Reference></Root>"#;
-        let result = String::from_utf8(
-            edit_signed_info(xml.as_bytes(), b"invHash", b"propHash").unwrap()
-        ).unwrap();
-        assert!(result.contains("otherHash"));
-    }
-
-    #[test]
-    fn test_edit_signed_info_preserves_structure() {
-        let xml = r#"<Root><Reference Id="invoiceSignedData"><DigestMethod Algorithm="test"/><DigestValue>hash</DigestValue></Reference></Root>"#;
-        let result = String::from_utf8(
-            edit_signed_info(xml.as_bytes(), b"newHash", b"propHash").unwrap()
-        ).unwrap();
-        assert!(result.contains("<DigestMethod"));
-        assert!(result.contains("Algorithm="));
-    }
-}
-    #[test]
-    fn test_edit_signing_time_updates_timestamp() {
-        let xml = r#"<Root>
-    <Data>Some data</Data>
-    <SigningTime>2023-10-01T12:00:00Z</SigningTime>
-    <MoreData>Other data</MoreData>
-</Root>"#;
-        let result = String::from_utf8(edit_signing_time(xml.as_bytes()).unwrap()).unwrap();
-        assert!(result.contains("<Data>Some data</Data>"));
-        assert!(result.contains("<MoreData>Other data</MoreData>"));
-        assert!(!result.contains("2023-10-01T12:00:00Z"));
-        assert!(result.contains("<SigningTime>"));
-        assert!(result.contains("T") && result.contains("Z")); // Contains ISO format timestamp
-    }
-
     #[test]
     fn test_edit_signed_info_invoice_hash_replacement() {
         let xml = r#"<Root><Reference Id="invoiceSignedData"><DigestValue>oldInvoiceHash</DigestValue></Reference></Root>"#;
@@ -517,4 +567,58 @@ mod tests {
         assert!(result.contains("<DigestMethod"));
         assert!(result.contains("Algorithm="));
     }
+}
+#[test]
+fn test_edit_signing_time_updates_timestamp() {
+    let xml = r#"<Root>
+    <Data>Some data</Data>
+    <SigningTime>2023-10-01T12:00:00Z</SigningTime>
+    <MoreData>Other data</MoreData>
+</Root>"#;
+    let result = String::from_utf8(edit_signing_time(xml.as_bytes()).unwrap()).unwrap();
+    assert!(result.contains("<Data>Some data</Data>"));
+    assert!(result.contains("<MoreData>Other data</MoreData>"));
+    assert!(!result.contains("2023-10-01T12:00:00Z"));
+    assert!(result.contains("<SigningTime>"));
+    assert!(result.contains("T") && result.contains("Z")); // Contains ISO format timestamp
+}
 
+#[test]
+fn test_edit_signed_info_invoice_hash_replacement() {
+    let xml = r#"<Root><Reference Id="invoiceSignedData"><DigestValue>oldInvoiceHash</DigestValue></Reference></Root>"#;
+    let result = String::from_utf8(
+        edit_signed_info(xml.as_bytes(), b"newInvoiceHash", b"propHash").unwrap(),
+    )
+    .unwrap();
+    assert!(!result.contains("oldInvoiceHash"));
+    assert!(result.contains("newInvoiceHash"));
+}
+
+#[test]
+fn test_edit_signed_info_signed_properties_hash_replacement() {
+    let xml = r#"<Root><Reference Type="http://www.w3.org/2000/09/xmldsig#SignatureProperties"><DigestValue>oldPropHash</DigestValue></Reference></Root>"#;
+    let result =
+        String::from_utf8(edit_signed_info(xml.as_bytes(), b"invHash", b"newPropHash").unwrap())
+            .unwrap();
+    assert!(!result.contains("oldPropHash"));
+    assert!(result.contains("newPropHash"));
+}
+
+#[test]
+fn test_edit_signed_info_preserves_other_digests() {
+    let xml = r#"<Root><Reference><DigestValue>otherHash</DigestValue></Reference></Root>"#;
+    let result =
+        String::from_utf8(edit_signed_info(xml.as_bytes(), b"invHash", b"propHash").unwrap())
+            .unwrap();
+    assert!(result.contains("otherHash"));
+}
+
+#[test]
+fn test_edit_signed_info_preserves_structure() {
+    let xml = r#"<Root><Reference Id="invoiceSignedData"><DigestMethod Algorithm="test"/><DigestValue>hash</DigestValue></Reference></Root>"#;
+    let result =
+        String::from_utf8(edit_signed_info(xml.as_bytes(), b"newHash", b"propHash").unwrap())
+            .unwrap();
+    assert!(result.contains("<DigestMethod"));
+    assert!(result.contains("Algorithm="));
+}

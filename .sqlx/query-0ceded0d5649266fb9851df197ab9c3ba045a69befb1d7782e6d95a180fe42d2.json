@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n    SELECT token_hash as \"token_hash!\"\n    FROM csr_challenges\n    WHERE company_id = $1\n      AND used_at IS NULL\n      AND expires_at > now()\n    LIMIT 1\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "token_hash!",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0ceded0d5649266fb9851df197ab9c3ba045a69befb1d7782e6d95a180fe42d2"
+}

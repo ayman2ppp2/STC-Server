@@ -50,7 +50,7 @@ impl SubmitInvoiceDto {
             .context("failed to decode the the certificate")?;
 
         let certificate = X509::from_der(&certificate)
-            .context("failed to create a certificate from the pem file")?;
+            .context("failed to create a certificate from the der file")?;
 
         let uuid = Uuid::from_str(&self.uuid)
             .context("failed to optain a valid uuid from the provided uuid")?;

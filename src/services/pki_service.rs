@@ -7,8 +7,8 @@ use openssl::hash::hash;
 use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
 
 pub async fn handle_enrollment(intermediate_dto: &IntermediateEnrollDto, crypto: &Crypto) -> Result<String, String> {
-    
-    
+
+
     let pubkey = &intermediate_dto
         .csr
         .public_key()
@@ -49,7 +49,7 @@ pub async fn verify_cert_with_ca(ca_crt: &X509, client_crt: &X509) -> anyhow::Re
     client_crt.verify(&ca_pub_key).context("failed to verifiy the certificate with the servers CA")
 }
 
-pub async fn verify_signature_with_cert(
+pub fn verify_signature_with_cert(
     recv_hash: &[u8],
     sig: &[u8],
     crt: &X509,
