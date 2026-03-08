@@ -1,4 +1,4 @@
-use crate::routes::{enroll::enroll, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr};
+use crate::{config::db_config, routes::{enroll::enroll, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr}};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
@@ -45,25 +45,8 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Server running on port {}", port);
 
-    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        let db_user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "postgres".to_string());
-        let db_password =
-            std::env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "password".to_string());
-        let db_name = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "stc-server".to_string());
-        let db_host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
-        let db_port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
-        format!(
-            "postgres://{}:{}@{}:{}/{}",
-            db_user, db_password, db_host, db_port, db_name
-        )
-    });
-
-    // println!("PORT = {:?}", std::env::var("PORT"));
-    // println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
-
-    let pool = PgPool::connect(&database_url)
-        .await
-        .unwrap_or_else(|_| panic!("Failed to connect to Postgres: {}", database_url));
+    let pool = db_config::db_from_env().await
+        .unwrap_or_else(|e| panic!("Failed to connect to Postgres: {}",e));
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -72,12 +55,13 @@ async fn main() -> std::io::Result<()> {
 
     let crypto_config = match Crypto::from_env().await {
         Ok(crypto_config) => crypto_config,
-        Err(e) => panic!("error in the reading of the crypto_config from env :{}", e),
+        Err(e) => panic!("Error in the reading of the crypto_config from env :{}", e),
     };
     let crypto_data = web::Data::new(crypto_config);
+    let pool_data = web::Data::new(pool);
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(pool.clone()))
+            .app_data(pool_data.clone())
             .app_data(crypto_data.clone())
             .app_data(web::JsonConfig::default().limit(256 * 1024))
             .route("/", web::get().to(hello))

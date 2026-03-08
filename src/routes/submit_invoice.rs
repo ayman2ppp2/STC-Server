@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpRequest, HttpResponse, web};
 use openssl::memcmp;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -21,10 +21,12 @@ use crate::{
 };
 
 pub async fn submit_invoice(
+    req: HttpRequest,
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    let simulation = req.headers().contains_key("X-Simulation-Mode");
     let intermidate_dto = invoice_dto
         .into_inner()
         .parse()
