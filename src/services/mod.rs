@@ -7,3 +7,7 @@ pub mod clear_invoice;
 pub mod verify_pih;
 pub mod edit_tlv;
 pub mod verify_qr;
+pub mod submit_invoice_service;
+pub mod save_invoice;
+pub mod check_uuid;
+pub mod schema_validation;

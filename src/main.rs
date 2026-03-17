@@ -1,10 +1,12 @@
-use crate::{config::db_config, routes::{enroll::enroll, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr}};
+use std::sync::Mutex;
+
+use crate::{config::{db_config, xsd_config::SchemaValidator}, routes::{clearance::clearance, enroll::enroll, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr}};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
 use sqlx::PgPool;
 
-use crate::routes::{health_check::health_check, submit_invoice::submit_invoice};
+use crate::routes::{health_check::health_check, };
 mod config;
 mod models;
 mod routes;
@@ -59,14 +61,16 @@ async fn main() -> std::io::Result<()> {
     };
     let crypto_data = web::Data::new(crypto_config);
     let pool_data = web::Data::new(pool);
+    let validator = web::Data::new(Mutex::new(SchemaValidator::new()));
     HttpServer::new(move || {
         App::new()
+            .app_data(validator.clone())
             .app_data(pool_data.clone())
             .app_data(crypto_data.clone())
             .app_data(web::JsonConfig::default().limit(256 * 1024))
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
-            .route("/submit_invoice", web::post().to(submit_invoice))
+            .route("/clear", web::post().to(clearance))
             .route("/enroll", web::post().to(enroll))
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))
