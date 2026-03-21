@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Context;
 use include_dir::{include_dir, Dir};
 use tempfile::TempDir;
 
@@ -11,21 +12,21 @@ pub struct SchemaValidator {
 }
 
 impl SchemaValidator {
-    pub fn new() -> Self {
-        let tmp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    pub fn new() -> anyhow::Result<Self> {
+        let tmp_dir = tempfile::tempdir().context("Failed to create temp dir")?;
         let tmp_path = tmp_dir.path();
 
         // Extract the embedded XSDs to the temporary location once at startup
-        XSD_DATA.extract(tmp_path).expect("Failed to extract XSDs");
+        XSD_DATA.extract(tmp_path).context("Failed to extract XSDs")?;
 
         let xsd_entry_path = tmp_path.join("maindoc/UBL-Invoice-2.1.xsd");
         
         println!("XSDs extracted to: {:?}", xsd_entry_path);
 
-        Self {
+        Ok(Self {
             xsd_entry_path,
             _temp_dir: tmp_dir,
-        }
+        })
     }
 }
 

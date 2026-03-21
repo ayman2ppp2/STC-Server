@@ -1,6 +1,5 @@
-use std::sync::Mutex;
 
-use crate::{config::{db_config, xsd_config::SchemaValidator}, routes::{clearance::clearance, enroll::enroll, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr}};
+use crate::{config::{db_config, xsd_config::SchemaValidator}, routes::{enroll::enroll, invoice_controller::{clearance, reporting}, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr}};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
@@ -59,9 +58,10 @@ async fn main() -> std::io::Result<()> {
         Ok(crypto_config) => crypto_config,
         Err(e) => panic!("Error in the reading of the crypto_config from env :{}", e),
     };
+    let validator = SchemaValidator::new().unwrap_or_else(|e| panic!("failed to obtain the schema validator path : {}",e));
     let crypto_data = web::Data::new(crypto_config);
     let pool_data = web::Data::new(pool);
-    let validator = web::Data::new(Mutex::new(SchemaValidator::new()));
+    let validator = web::Data::new(validator);
     HttpServer::new(move || {
         App::new()
             .app_data(validator.clone())
@@ -71,6 +71,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/clear", web::post().to(clearance))
+            .route("/reporting", web::post().to(reporting))
             .route("/enroll", web::post().to(enroll))
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))

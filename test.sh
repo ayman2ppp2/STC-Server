@@ -1,5 +1,5 @@
 # https://stc-server.onrender.com/submit_invoice
-curl -X POST http://localhost:8080/submit_invoice \
+curl -X POST http://localhost:8080/clear \
   -H "Content-Type: application/json" \
   -d '{
   "invoice_hash": "V4U5qlZ3yXQ/Si1AC/R8SLc3F+iNy27wdVe8IWRqFAQ=",

@@ -11,3 +11,6 @@ pub mod submit_invoice_service;
 pub mod save_invoice;
 pub mod check_uuid;
 pub mod schema_validation;
+pub mod validation_service;
+pub mod clearance_service;
+pub mod reporting_service;

@@ -2,7 +2,7 @@ use anyhow::{Context, Result, bail};
 use openssl::memcmp;
 use sqlx::PgPool;
 
-use crate::{config::{crypto_config::Crypto, xsd_config::SchemaValidator}, models::submit_invoice_dto::{IntermediateInvoiceDto, SubmitInvoiceDto}, services::{check_uuid::check_uuid, clear_invoice::clear_invoice, pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert}, save_invoice::save_invoice, schema_validation::validate_schema, verify_pih::verify_pih}};
+use crate::{config::{crypto_config::Crypto, xsd_config::SchemaValidator}, models::submit_invoice_dto::IntermediateInvoiceDto, services::{check_uuid::check_uuid, clear_invoice::clear_invoice, pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert}, save_invoice::save_invoice, schema_validation::validate_schema, verify_pih::verify_pih}};
 
 pub async fn process_invoice(
     intermediate: IntermediateInvoiceDto,
@@ -18,7 +18,7 @@ pub async fn process_invoice(
     }
 
     // validate schema
-    let xml_body = std::str::from_utf8(&intermediate.canonicalized_invoice_bytes)
+    let xml_body = std::str::from_utf8(&intermediate.invoice_bytes)
         .context("Invoice XML is not valid UTF-8")?;
     validate_schema(schema, xml_body)?;
 
