@@ -1,11 +1,12 @@
 use actix_web::{HttpResponse, web};
 use openssl::memcmp;
+use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
     config::crypto_config::Crypto,
-    models::enrollment_dto::{EnrollDTO, EnrollResponse},
-    services::pki_service::handle_enrollment,
+    models::{enrollment_dto::EnrollDTO, responses::ApiResponse},
+    services::{pki_service::handle_enrollment, token_checking::fetch_token_hash},
 };
 
 pub async fn enroll(
@@ -14,51 +15,68 @@ pub async fn enroll(
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
     // extract the company id from the csr and comapre it with the company id associated with the token the user provides
-    let intermediate_dto = &dto
-        .into_inner()
-        .parse()
-        .map_err(actix_web::error::ErrorBadRequest)?;
+    let intermediate_dto = match dto.into_inner().parse() {
+        Ok(intermediate) => intermediate,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Failed to fetch the company id".to_string(),
+                    data: Some(json!({"details":e.to_string()})),
+                }),
+            );
+        }
+    };
 
-    let extracted_company_id = intermediate_dto
-        .get_company_id()
-        .map_err(actix_web::error::ErrorBadRequest)?;
+    let extracted_company_id = match intermediate_dto.get_company_id() {
+        Ok(id) => id,
+        Err(e) => {
+            return Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Failed to fetch the company id".to_string(),
+                    data: Some(json!({"details":e.to_string()})),
+                }),
+            );
+        }
+    };
     //fetch for token that have the same company id if any ,
-    let fetched_token = sqlx::query!(
-        r#"
-    SELECT token_hash as "token_hash!"
-    FROM csr_challenges
-    WHERE company_id = $1
-      AND used_at IS NULL
-      AND expires_at > now()
-    LIMIT 1
-    "#,
-        &extracted_company_id,
-    )
-    .fetch_optional(pool.get_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
-
+    let fetched_token = match fetch_token_hash(&extracted_company_id, &pool).await {
+        Ok(token_hash) => token_hash,
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Internal server error".to_string(),
+                    data: Some(json!({ "details": e.to_string() })),
+                }),
+            );
+        }
+    };
     // compare the received token hash with the fetched token hash,
     match fetched_token {
         Some(token) => {
-            if !memcmp::eq(&intermediate_dto.token, &token.token_hash) {
+            if !memcmp::eq(&intermediate_dto.token, &token) {
                 return Err(actix_web::error::ErrorBadRequest("token hash mismatch"));
             }
             // if valid handle the enrollment otherwise , return an invalid token error,
-            match handle_enrollment(intermediate_dto, crypto.get_ref()).await {
-                Ok(crt) => {
-                    let response = EnrollResponse {
-                        certificate: crt,
-                        status: "enrolled".to_string(),
-                    };
-                    Ok(HttpResponse::Ok().json(response))
-                }
-                Err(e) => Ok(HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "Enrollment failed",
-                    "details": e
-                }))),
+            match handle_enrollment(&intermediate_dto, crypto.get_ref()).await {
+                Ok(crt) => Ok(HttpResponse::Ok().json(ApiResponse {
+                    success: true,
+                    message: "enrolled".to_string(),
+                    data: Some(json!({"certificate": crt,})),
+                })),
+                Err(e) => Ok(HttpResponse::BadRequest().json(ApiResponse {
+                    success: false,
+                    message: "Enrollment failed".to_string(),
+                    data: Some(json!({"details" : e.to_string()})),
+                })),
             }
         }
-        None => Err(actix_web::error::ErrorBadRequest("no valid token found")),
+        None => Ok(HttpResponse::BadRequest().json(ApiResponse {
+                    success: false,
+                    message: "Enrollment failed".to_string(),
+                    data: Some(json!({"details" : "failed to find a valid token"})),
+                })),
     }
 }

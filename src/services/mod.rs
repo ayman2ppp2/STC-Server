@@ -14,3 +14,4 @@ pub mod schema_validation;
 pub mod validation_service;
 pub mod clearance_service;
 pub mod reporting_service;
+pub mod token_checking;
