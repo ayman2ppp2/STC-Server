@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     clang libclang-dev libxml2-dev pkg-config libssl-dev
 # Build only your app code (should take < 10-20s)
-ENV SQLX_OFFLINE=true
+# ENV SQLX_OFFLINE=true
 ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
 RUN cargo build --release --bin stc-server
 # ------------------------------------------------------------------------------
