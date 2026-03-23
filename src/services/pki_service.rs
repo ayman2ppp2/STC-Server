@@ -41,12 +41,12 @@ pub async fn handle_enrollment(intermediate_dto: &IntermediateEnrollDto, crypto:
 // wite a function that gets submit_invoice certificate and then verifies it returning a bool
 
 pub async fn verify_cert_with_ca(ca_crt: &X509, client_crt: &X509) -> anyhow::Result<bool> {
-    let now = Asn1Time::days_from_now(0)?;
+    let now = Asn1Time::days_from_now(0).context("failed to generate the time in the server")?;
     if client_crt.not_before() > now || client_crt.not_after() < now {
-        return Err(anyhow!("dates not valid"));
+        return Err(anyhow!("certficate is expired or yet to be used"));
     }
-    let ca_pub_key = ca_crt.public_key()?;
-    Ok(client_crt.verify(&ca_pub_key)?)
+    let ca_pub_key = ca_crt.public_key().context("failed to extract the public key from the cerificate")?;
+    client_crt.verify(&ca_pub_key).context("failed to verifiy the certificate with the servers CA")
 }
 
 pub fn verify_signature_with_cert(
