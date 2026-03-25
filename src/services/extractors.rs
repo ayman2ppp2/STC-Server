@@ -375,9 +375,130 @@ pub fn extract_pih(invoice: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(pih_hash.into())
 }
 
+
+
+#[derive(Debug, PartialEq)]
+enum ProfileState {
+    Searching,
+    InsideProfileId,
+}
+
+pub fn extract_profile_id(invoice: &[u8]) -> anyhow::Result<String> {
+    let mut reader = Reader::from_reader(Cursor::new(invoice));
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::with_capacity(1024);
+    let mut state = ProfileState::Searching;
+    let mut profile_id = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                // local_name() handles "cbc:ProfileID" as just "ProfileID"
+                if e.local_name().as_ref() == b"ProfileID" {
+                    state = ProfileState::InsideProfileId;
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                if state == ProfileState::InsideProfileId {
+                    profile_id = e.decode()?.into_owned();
+                }
+            }
+
+            Ok(Event::End(e)) => {
+                if e.local_name().as_ref() == b"ProfileID" {
+                    // Once we close the tag, we can stop reading
+                    if !profile_id.is_empty() {
+                        break;
+                    }
+                    state = ProfileState::Searching;
+                }
+            }
+
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(anyhow::anyhow!("XML error: {e}")),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    if profile_id.is_empty() {
+        return Err(anyhow::anyhow!("cbc:ProfileID not found in invoice"));
+    }
+
+    Ok(profile_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn create_invoice_xml(profile_id: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+                xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+                <cbc:ProfileID>{}</cbc:ProfileID>
+                <cbc:ID>SME00015</cbc:ID>
+            </Invoice>"#,
+            profile_id
+        )
+    }
+
+    #[test]
+    fn test_extract_reporting_profile() {
+        let xml = create_invoice_xml("reporting:1.0");
+        let result = extract_profile_id(xml.as_bytes()).unwrap();
+        assert_eq!(result, "reporting:1.0");
+    }
+
+    #[test]
+    fn test_extract_clearance_profile() {
+        let xml = create_invoice_xml("clearance:1.0");
+        let result = extract_profile_id(xml.as_bytes()).unwrap();
+        assert_eq!(result, "clearance:1.0");
+    }
+
+    #[test]
+    fn test_extract_profile_id_missing_tag() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <Invoice>
+                <cbc:ID>SME00015</cbc:ID>
+            </Invoice>"#;
+        
+        let result = extract_profile_id(xml.as_bytes());
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "cbc:ProfileID not found in invoice");
+    }
+
+    #[test]
+    fn test_extract_profile_id_empty_tag() {
+        let xml = r#"<Invoice><cbc:ProfileID></cbc:ProfileID></Invoice>"#;
+        let result = extract_profile_id(xml.as_bytes());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_malformed_xml() {
+        let xml = r#"<Invoice><cbc:ProfileID>reporting:1.0</Invoice>"#; // Missing closing tag
+        let result = extract_profile_id(xml.as_bytes());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_integration_with_enum_logic() {
+        // This simulates how you'd use it with the InvoiceType enum logic
+        let xml = create_invoice_xml("reporting:1.0");
+        let raw_id = extract_profile_id(xml.as_bytes()).unwrap();
+        
+        let inv_type = if raw_id.contains("reporting") {
+            "Reporting"
+        } else {
+            "Clearance"
+        };
+        
+        assert_eq!(inv_type, "Reporting");
+    }
     #[test]
     fn test_extract_pih() {
         let xml = br#"<cac:AdditionalDocumentReference>

@@ -37,7 +37,7 @@ impl IntermediateEnrollDto {
             .subject_name()
             .entries_by_nid(Nid::SERIALNUMBER)
             .next()
-            .ok_or_else(|| anyhow!("CSR is missing the Serial Number (Company ID)"))?;
+            .ok_or_else(|| anyhow!("CSR is missing the Serial Number (Company ID/Supplier ID)"))?;
 
         // 2. Safely convert the ASN1 string to a Rust String
         let company_id = entry
