@@ -3,12 +3,9 @@ use sqlx::PgPool;
 
 use crate::{
     config::{crypto_config::Crypto, xsd_config::SchemaValidator},
-    models::submit_invoice_dto::IntermediateInvoiceDto,
+    models::submit_invoice_dto::{IntermediateInvoiceDto, InvoiceType},
     services::{
-        check_uuid::check_uuid,
-        pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert},
-        schema_validation::validate_schema,
-        verify_pih::verify_pih,
+        check_uuid::check_uuid, invoice_type_service::verify_invoice_type, pki_service::{compute_hash, verify_cert_with_ca, verify_signature_with_cert}, schema_validation::validate_schema, verify_pih::verify_pih
     },
 };
 
@@ -18,6 +15,7 @@ pub async fn validate_invoice(
     crypto: &Crypto,
     sandbox: bool,
     schema: &SchemaValidator,
+    invoice_type: InvoiceType,
 ) -> anyhow::Result<()> {
     // 1. Check UUID
     if !sandbox {
@@ -29,6 +27,13 @@ pub async fn validate_invoice(
         .context("Invoice XML is not valid UTF-8")?;
     validate_schema(schema, xml_body)?;
 
+    // 3. verify invoice type
+
+    match verify_invoice_type(&intermediate.invoice_bytes,&invoice_type) {
+        Ok(_)=> {},
+        Err(e)=> bail!("invoice type mismatch : {}",e)
+    }
+
     // 3. Verify Hash
     let received_hash = &intermediate.invoice_hash;
     let computed_hash = compute_hash(&intermediate.canonicalized_invoice_bytes)?;
@@ -38,7 +43,7 @@ pub async fn validate_invoice(
 
     // 4. Verify PIH (Previous Invoice Hash) chain
     if !sandbox {
-        verify_pih(&intermediate.invoice_bytes, db_pool, &intermediate.company).await?;
+        verify_pih(&intermediate.invoice_bytes, db_pool, &intermediate.company,invoice_type).await?;
     }
 
     // 5. Verify Cryptography
@@ -51,3 +56,5 @@ pub async fn validate_invoice(
 
     Ok(())
 }
+
+

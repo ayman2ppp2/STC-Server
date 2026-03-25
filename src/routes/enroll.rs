@@ -21,7 +21,7 @@ pub async fn enroll(
             return Ok(
                 HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                     success: false,
-                    message: "Failed to fetch the company id".to_string(),
+                    message: "CSR Parsing Error".to_string(),
                     data: Some(json!({"details":e.to_string()})),
                 }),
             );

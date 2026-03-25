@@ -4,7 +4,7 @@ use sqlx::PgPool;
 
 use crate::{
     config::{crypto_config::Crypto, xsd_config::SchemaValidator},
-    models::{responses::ApiResponse, submit_invoice_dto::SubmitInvoiceDto},
+    models::{responses::ApiResponse, submit_invoice_dto::{InvoiceType, SubmitInvoiceDto}},
     services::{clearance_service::process_clearance, reporting_service::process_reporting},
 };
 
@@ -18,7 +18,7 @@ pub async fn clearance(
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
     let intermediate_dto = invoice_dto.into_inner().parse().map_err(actix_web::error::ErrorBadRequest)?;
 
-    match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator).await {
+    match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator,InvoiceType::Clearance).await {
         Ok(cleared_invoice) => Ok(HttpResponse::Ok().json(ApiResponse {
             success: true,
             message: "Invoice cleared".into(),
@@ -42,7 +42,7 @@ pub async fn reporting(
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
     let intermediate_dto = invoice_dto.into_inner().parse().map_err(actix_web::error::ErrorBadRequest)?;
 
-    match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator).await {
+    match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator,InvoiceType::Reporting).await {
         Ok(_) => Ok(HttpResponse::Accepted().json(ApiResponse::<()> {
             success: true,
             message: "Invoice reported".into(),

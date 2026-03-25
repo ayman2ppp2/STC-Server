@@ -17,6 +17,20 @@ pub struct SubmitInvoiceDto {
     invoice_hash: String,
     invoice: String,
 }
+#[derive(Debug,PartialEq, Eq)]
+pub enum InvoiceType{
+    Reporting,
+    Clearance,
+}
+
+impl InvoiceType{
+    pub fn as_str(&self)->&'static str{
+        match self {
+            InvoiceType::Reporting=> "reporting",
+            InvoiceType::Clearance => "clearance",
+        }
+    }
+}
 
 pub struct IntermediateInvoiceDto {
     pub uuid: Uuid,
