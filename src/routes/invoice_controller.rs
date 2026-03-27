@@ -43,7 +43,7 @@ pub async fn reporting(
     let intermediate_dto = invoice_dto.into_inner().parse().map_err(actix_web::error::ErrorBadRequest)?;
 
     match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator,InvoiceType::Reporting).await {
-        Ok(_) => Ok(HttpResponse::Accepted().json(ApiResponse::<()> {
+        Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::<()> {
             success: true,
             message: "Invoice reported".into(),
             data: None, // Reporting usually doesn't return a payload

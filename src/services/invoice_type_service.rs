@@ -8,7 +8,7 @@ pub fn verify_invoice_type(
 ) -> anyhow::Result<bool> {
     let ex_invoice_type = match extract_profile_id(invoice_bytes) {
         Ok(invoice_id) => {
-            if invoice_id.contains("reporing") {
+            if invoice_id.contains("reporting") {
                 InvoiceType::Reporting
             } else if invoice_id.contains("clearance") {
                 InvoiceType::Clearance
