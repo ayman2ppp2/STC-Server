@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use crate::{
     config::crypto_config::Crypto,
     models::{enrollment_dto::EnrollDTO, responses::ApiResponse},
-    services::{pki_service::enroll_device, token_checking::{fetch_token_hash, mark_token_used}},
+    services::{pki_service::enroll_device, token_checking::{fetch_token, mark_token_used}},
 };
 
 pub async fn enroll(
@@ -14,7 +14,6 @@ pub async fn enroll(
     crypto: web::Data<Crypto>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // extract the company id from the csr and comapre it with the company id associated with the token the user provides
     let intermediate_dto = match dto.into_inner().parse() {
         Ok(intermediate) => intermediate,
         Err(e) => {
@@ -28,7 +27,7 @@ pub async fn enroll(
         }
     };
 
-    let extracted_device_id = match intermediate_dto.get_device_id() {
+    let _extracted_device_id = match intermediate_dto.get_device_id() {
         Ok(id) => id,
         Err(e) => {
             return Ok(
@@ -40,8 +39,8 @@ pub async fn enroll(
             );
         }
     };
-    //fetch for token that have the same device id if any ,
-    let fetched_token = match fetch_token_hash(&extracted_device_id, &pool).await {
+
+    let stored_token_hash = match fetch_token(&intermediate_dto.token, &pool).await {
         Ok(token_hash) => token_hash,
         Err(e) => {
             return Ok(
@@ -53,16 +52,21 @@ pub async fn enroll(
             );
         }
     };
-    // compare the received token hash with the fetched token hash,
-    match fetched_token {
+
+    match stored_token_hash {
         Some(token_hash) => {
-            if !memcmp::eq(&intermediate_dto.token, &token_hash) {
+            let token_bytes = intermediate_dto.token.as_bytes();
+            let computed_hash = crate::services::pki_service::compute_hash(token_bytes)
+                .map_err(|e| {
+                    actix_web::error::ErrorInternalServerError(format!("Hash error: {}", e))
+                })?;
+
+            if !memcmp::eq(&computed_hash, &token_hash) {
                 return Err(actix_web::error::ErrorBadRequest("token hash mismatch"));
             }
-            // if valid handle the enrollment otherwise , return an invalid token error,
+
             match enroll_device(&intermediate_dto, crypto.get_ref(), &pool).await {
                 Ok(crt) => {
-                    // Mark token as used after successful enrollment
                     if let Err(e) = mark_token_used(&token_hash, &pool).await {
                         return Ok(HttpResponse::InternalServerError().json(ApiResponse {
                             success: false,

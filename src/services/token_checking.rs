@@ -1,16 +1,18 @@
+use crate::services::pki_service::compute_hash;
 use sqlx::PgPool;
 
-pub async fn fetch_token_hash(id: &str, pool: &PgPool) -> anyhow::Result<Option<Vec<u8>>> {
+pub async fn fetch_token(token: &str, pool: &PgPool) -> anyhow::Result<Option<Vec<u8>>> {
+    let token_hash = compute_hash(token.as_bytes())?;
     let record = sqlx::query!(
         r#"
     SELECT token_hash as "token_hash!"
     FROM csr_challenges
-    WHERE company_id = $1
+    WHERE token_hash = $1
       AND used_at IS NULL
       AND expires_at > now()
     LIMIT 1
     "#,
-        &id,
+        token_hash,
     )
     .fetch_optional(pool)
     .await?;
