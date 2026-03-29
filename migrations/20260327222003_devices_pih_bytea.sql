@@ -1,0 +1,10 @@
+BEGIN;
+
+ALTER TABLE devices ALTER COLUMN last_pih DROP DEFAULT;
+
+ALTER TABLE devices ALTER COLUMN last_pih TYPE BYTEA USING last_pih::bytea;
+
+ALTER TABLE devices ALTER COLUMN last_pih SET DEFAULT 
+    '\\x5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9'::bytea;
+
+COMMIT;

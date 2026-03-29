@@ -506,6 +506,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d630bccd429a5bb5a64b5e94f693bfc48c9f8566418fda4c494cc94f911f87cc"
 dependencies = [
  "powerfmt",
+ "serde",
 ]
 
 [[package]]
@@ -2096,6 +2097,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tempfile",
+ "time",
  "tokio",
  "uuid",
  "xml_c14n",

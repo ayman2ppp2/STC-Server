@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT device_uuid, tin, current_icv, last_pih, COALESCE(is_active, false) AS \"is_active!: bool\", COALESCE(onboarded_at, NOW()) AS \"onboarded_at!: OffsetDateTime\"\n        FROM devices\n        WHERE device_uuid = $1::uuid\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "device_uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tin",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "current_icv",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_pih",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 4,
+        "name": "is_active!: bool",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "onboarded_at!: OffsetDateTime",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ba0be1e85ee3b1a05bcd18ff1633fa15a3aa9024d7947283dd67d3e9dc2b4451"
+}

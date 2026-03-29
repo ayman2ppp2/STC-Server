@@ -1,5 +1,5 @@
 use anyhow::Context;
-use quick_xml::{Reader, Writer, events::Event};
+use quick_xml::{events::Event, Reader, Writer};
 use std::io::Cursor;
 
 #[derive(PartialEq)]
@@ -257,7 +257,65 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(writer.into_inner().into_inner())
 }
 
-pub fn extract_company_id(invoice: &[u8]) -> anyhow::Result<String> {
+pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
+    let mut reader = Reader::from_reader(Cursor::new(invoice));
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::with_capacity(1024);
+    let mut in_icv_block = false;
+    let mut icv_value = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = e.local_name();
+                let tag = std::str::from_utf8(name.as_ref())?;
+
+                if tag == "ID" {
+                    in_icv_block = true;
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                if in_icv_block {
+                    let text = e.decode().context("failed to read ICV from invoice")?;
+                    if text == "ICV" {
+                        // Found ICV marker, next UUID will have the value
+                    } else if !text.is_empty() && icv_value.is_empty() {
+                        // This is the value we want
+                        icv_value = text.into_owned();
+                    }
+                }
+            }
+
+            Ok(Event::End(e)) => {
+                let tag = e.local_name();
+                if tag.as_ref() == b"AdditionalDocumentReference" {
+                    if !icv_value.is_empty() {
+                        break;
+                    }
+                    in_icv_block = false;
+                }
+            }
+
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(anyhow::anyhow!("XML error: {e}")),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    if icv_value.is_empty() {
+        return Err(anyhow::anyhow!("ICV not found in invoice"));
+    }
+
+    icv_value
+        .trim()
+        .parse::<i32>()
+        .map_err(|_| anyhow::anyhow!("Invalid ICV value: {}", icv_value))
+}
+
+pub fn extract_customer_id(invoice: &[u8]) -> anyhow::Result<String> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
 
@@ -282,7 +340,49 @@ pub fn extract_company_id(invoice: &[u8]) -> anyhow::Result<String> {
                 if in_accounting_customer_party {
                     let text = e
                         .decode()
-                        .context("failed to read the company id from invoice")?;
+                        .context("failed to read the customer TIN from invoice")?;
+                    if current == 1 {
+                        company_id.push_str(&text)
+                    }
+                }
+            }
+
+            Ok(Event::End(_)) => current = 0,
+            Ok(Event::Eof) => break,
+            Err(e) => panic!("XML error: {e}"),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    Ok(company_id)
+}
+pub fn extract_supplier_id(invoice: &[u8]) -> anyhow::Result<String> {
+    let mut reader = Reader::from_reader(Cursor::new(invoice));
+    reader.config_mut().trim_text(true);
+
+    let mut buf = Vec::with_capacity(1024);
+
+    let mut current = 0u8;
+    let mut in_accounting_supplier_party = false;
+    let mut company_id = String::with_capacity(2048);
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                if e.local_name().as_ref() == b"AccountingSupplierParty" {
+                    in_accounting_supplier_party = true
+                }
+                if e.local_name().as_ref() == b"CompanyID" {
+                    current = 1
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                if in_accounting_supplier_party {
+                    let text = e
+                        .decode()
+                        .context("failed to read the supplier TIN from invoice")?;
                     if current == 1 {
                         company_id.push_str(&text)
                     }
@@ -375,8 +475,6 @@ pub fn extract_pih(invoice: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(pih_hash.into())
 }
 
-
-
 #[derive(Debug, PartialEq)]
 enum ProfileState {
     Searching,
@@ -465,10 +563,13 @@ mod tests {
             <Invoice>
                 <cbc:ID>SME00015</cbc:ID>
             </Invoice>"#;
-        
+
         let result = extract_profile_id(xml.as_bytes());
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "cbc:ProfileID not found in invoice");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "cbc:ProfileID not found in invoice"
+        );
     }
 
     #[test]
@@ -490,15 +591,30 @@ mod tests {
         // This simulates how you'd use it with the InvoiceType enum logic
         let xml = create_invoice_xml("reporting:1.0");
         let raw_id = extract_profile_id(xml.as_bytes()).unwrap();
-        
+
         let inv_type = if raw_id.contains("reporting") {
             "Reporting"
         } else {
             "Clearance"
         };
-        
+
         assert_eq!(inv_type, "Reporting");
     }
+    #[test]
+    fn test_extract_icv() {
+        let xml = br#"<cac:AdditionalDocumentReference>
+        <cbc:ID>ICV</cbc:ID>
+        <cbc:UUID>23</cbc:UUID>
+    </cac:AdditionalDocumentReference>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>PIH</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>"#;
+        assert_eq!(extract_icv(xml).unwrap(), 23);
+    }
+
     #[test]
     fn test_extract_pih() {
         let xml = br#"<cac:AdditionalDocumentReference>
@@ -520,7 +636,7 @@ mod tests {
         assert_eq!(extract_pih(xml).expect("shit happend in the test"),b"NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==");
     }
     #[test]
-    fn test_extract_company_id() {
+    fn test_extract_customer_id() {
         let xml = br#"<cac:AccountingSupplierParty>
         <cac:Party>
             <cac:PartyIdentification>
@@ -570,7 +686,7 @@ mod tests {
             </cac:PartyLegalEntity>
         </cac:Party>
     </cac:AccountingCustomerParty>"#;
-        assert_eq!(extract_company_id(xml).unwrap(), "399999999800003")
+        assert_eq!(extract_customer_id(xml).unwrap(), "399999999800003")
     }
     #[test]
     fn test_extract_signed_properties() {
