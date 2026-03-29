@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n    SELECT EXISTS(\n        SELECT 1 \n        FROM taxpayers \n        WHERE tin = $1\n    ) AS \"exists!\"\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "649a79357b3e55060a3a36c8a7594ae6b269fe440c77c8733f5d1515944bb9a1"
+}

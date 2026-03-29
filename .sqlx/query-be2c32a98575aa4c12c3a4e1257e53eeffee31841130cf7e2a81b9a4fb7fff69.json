@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM csr_challenges\n        WHERE expires_at < now()\n          AND used_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "be2c32a98575aa4c12c3a4e1257e53eeffee31841130cf7e2a81b9a4fb7fff69"
+}

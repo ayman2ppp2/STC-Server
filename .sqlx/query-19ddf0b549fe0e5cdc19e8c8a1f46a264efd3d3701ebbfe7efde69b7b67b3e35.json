@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE devices\n        SET current_icv = $2, last_pih = $3\n        WHERE device_uuid = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "19ddf0b549fe0e5cdc19e8c8a1f46a264efd3d3701ebbfe7efde69b7b67b3e35"
+}
