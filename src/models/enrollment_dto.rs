@@ -2,7 +2,6 @@ use anyhow::{anyhow, Context};
 use base64::{engine::general_purpose, Engine};
 use openssl::{nid::Nid, x509::X509Req};
 
-use crate::services::pki_service::compute_hash;
 #[derive(serde::Deserialize)]
 pub struct EnrollDTO {
     pub token: String,
@@ -16,7 +15,7 @@ pub struct EnrollDTO {
 // }
 
 pub struct IntermediateEnrollDto {
-    pub token: Vec<u8>,
+    pub token: String,
     pub csr: X509Req,
 }
 
@@ -27,11 +26,13 @@ impl EnrollDTO {
             .map_err(|e| format!("Failed to decode the der bytes : {}", e))?;
         let csr = X509Req::from_der(&der)
             .map_err(|e| format!("Failed to parse the certificate request : {}", e))?;
-        let token = compute_hash(self.token.as_bytes())
-            .map_err(|e| format!("Failed to compute token hash: {}", e))?;
-        Ok(IntermediateEnrollDto { token, csr })
+        Ok(IntermediateEnrollDto {
+            token: self.token.clone(),
+            csr,
+        })
     }
 }
+
 impl IntermediateEnrollDto {
     pub fn get_device_id(&self) -> anyhow::Result<String> {
         let entry = self

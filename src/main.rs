@@ -87,7 +87,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/clear", web::post().to(clearance))
-            .route("/reporting", web::post().to(reporting))
+            .route("/report", web::post().to(reporting))
             .route("/enroll", web::post().to(enroll))
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))

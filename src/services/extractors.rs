@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{Context, bail};
 use quick_xml::{events::Event, Reader, Writer};
 use std::io::Cursor;
 
@@ -186,7 +186,7 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
 
             Ok(Event::End(_)) => current = 0,
             Ok(Event::Eof) => break,
-            Err(e) => panic!("XML error: {e}"),
+            Err(e) => bail!("XML error: {}",e),
             _ => {}
         }
         buf.clear();
