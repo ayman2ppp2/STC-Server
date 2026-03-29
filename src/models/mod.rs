@@ -5,3 +5,4 @@ pub mod submit_invoice_response_dto;
 pub mod onboard_dto;
 pub mod qr_verification_model;
 pub mod responses;
+pub mod device;

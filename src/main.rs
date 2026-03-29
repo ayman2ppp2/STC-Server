@@ -5,7 +5,8 @@ use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use config::crypto_config::Crypto;
 use sqlx::PgPool;
 
-use crate::routes::{health_check::health_check, };
+use crate::routes::health_check::health_check;
+use crate::services::token_checking::cleanup_expired_tokens;
 mod config;
 mod models;
 mod routes;
@@ -53,6 +54,21 @@ async fn main() -> std::io::Result<()> {
         .run(&pool)
         .await
         .expect("Failed to run migrations");
+
+    // Spawn background task for token cleanup
+    let cleanup_pool = pool.clone();
+    tokio::spawn(async move {
+        use tokio::time::{interval, Duration};
+        let mut cleanup_interval = interval(Duration::from_secs(3600));
+        loop {
+            cleanup_interval.tick().await;
+            match cleanup_expired_tokens(&cleanup_pool).await {
+                Ok(count) if count > 0 => println!("🧹 Cleaned {} expired tokens", count),
+                Ok(_) => {}
+                Err(e) => eprintln!("❌ Token cleanup failed: {}", e),
+            }
+        }
+    });
 
     let crypto_config = match Crypto::from_env().await {
         Ok(crypto_config) => crypto_config,

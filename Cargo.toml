@@ -16,6 +16,7 @@ base64 = "0.22.1"
 openssl = "0.10.75"
 hex = "0.4.3"
 xml_c14n = "0.3.0"
+time = { version = "0.3", features = ["serde"] }
 chrono = "0.4.43"
 anyhow = "1.0.100"
 uuid = {version ="1.20.0",features=["serde","v4"]}

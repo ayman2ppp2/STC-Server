@@ -6,11 +6,13 @@ use base64::engine::general_purpose;
 
 use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
+use crate::models::device::Device;
 use crate::services::c14n11::canonicalize_c14n11;
-use crate::services::extractors::{extract_company_id, extract_invoice, extract_sig_crt};
+use crate::services::device_service::get_device;
+use crate::services::extractors::{extract_invoice, extract_sig_crt, extract_supplier_id};
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct SubmitInvoiceDto {
     uuid: String,
@@ -39,11 +41,12 @@ pub struct IntermediateInvoiceDto {
     pub invoice_hash: Vec<u8>,
     pub invoice_signature: Vec<u8>,
     pub certificate: X509,
-    pub company: String,
+    pub supplier: String,
+    pub device:Device,
 }
 
 impl SubmitInvoiceDto {
-    pub fn parse(self) -> anyhow::Result<IntermediateInvoiceDto> {
+    pub async fn parse(self,pool:&PgPool) -> anyhow::Result<IntermediateInvoiceDto> {
         let invoice_bytes = general_purpose::STANDARD
             .decode(self.invoice)
             .context("failed to decode the the invoice")?;
@@ -68,8 +71,9 @@ impl SubmitInvoiceDto {
 
         let uuid = Uuid::from_str(&self.uuid)
             .context("failed to optain a valid uuid from the provided uuid")?;
-        let company = extract_company_id(&invoice_bytes)
+        let supplier = extract_supplier_id(&invoice_bytes)
             .context("failed to extract the company id from the invoice")?;
+        let device = get_device(&certificate,pool).await?;
         Ok(IntermediateInvoiceDto {
             uuid,
             invoice_bytes,
@@ -77,7 +81,8 @@ impl SubmitInvoiceDto {
             invoice_hash,
             invoice_signature,
             certificate,
-            company,
+            supplier,
+            device,
         })
     }
 }

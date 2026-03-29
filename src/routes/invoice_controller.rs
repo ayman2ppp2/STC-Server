@@ -16,7 +16,7 @@ pub async fn clearance(
     schema_validator: web::Data<SchemaValidator>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
-    let intermediate_dto = invoice_dto.into_inner().parse().map_err(actix_web::error::ErrorBadRequest)?;
+    let intermediate_dto = invoice_dto.into_inner().parse(&db_pool).await.map_err(actix_web::error::ErrorBadRequest)?;
 
     match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator,InvoiceType::Clearance).await {
         Ok(cleared_invoice) => Ok(HttpResponse::Ok().json(ApiResponse {
@@ -40,7 +40,7 @@ pub async fn reporting(
     schema_validator: web::Data<SchemaValidator>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
-    let intermediate_dto = invoice_dto.into_inner().parse().map_err(actix_web::error::ErrorBadRequest)?;
+    let intermediate_dto = invoice_dto.into_inner().parse(&db_pool).await.map_err(actix_web::error::ErrorBadRequest)?;
 
     match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator,InvoiceType::Reporting).await {
         Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::<()> {
