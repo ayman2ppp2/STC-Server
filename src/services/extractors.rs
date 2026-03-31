@@ -1,4 +1,4 @@
-use anyhow::{Context, bail};
+use anyhow::{bail, Context};
 use quick_xml::{events::Event, Reader, Writer};
 use std::io::Cursor;
 
@@ -10,6 +10,8 @@ enum State {
     InAdditionalDocRefId,
 }
 
+/// Extracts and cleans invoice XML by removing UBL extensions, signature,
+/// and QR document references.
 pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     // 1. Remove XML declaration if present
     let xml_to_parse = if raw_xml.starts_with(b"<?xml") {
@@ -157,6 +159,7 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(writer.into_inner())
 }
 
+/// Extracts signature value and X509 certificate from signed XML.
 pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(true);
@@ -176,7 +179,7 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
             },
 
             Ok(Event::Text(e)) => {
-                let text = e.decode().expect("failed to decode the xml");
+                let text = e.decode().context("failed to decode XML")?;
                 match current {
                     1 => signature.push_str(&text),
                     2 => certificate.push_str(&text),
@@ -186,7 +189,7 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
 
             Ok(Event::End(_)) => current = 0,
             Ok(Event::Eof) => break,
-            Err(e) => bail!("XML error: {}",e),
+            Err(e) => bail!("XML error: {e}"),
             _ => {}
         }
         buf.clear();
@@ -194,6 +197,8 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
 
     Ok((signature.into(), certificate.into()))
 }
+
+/// Extracts the SignedProperties element from XML signature.
 pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(false);
@@ -210,11 +215,11 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                 if e.local_name().as_ref() == b"SignedProperties" {
                     capturing = true;
                     depth = 1;
+                    let mut elem = e.to_owned();
+                    elem.push_attribute(("xmlns:xades", "http://uri.etsi.org/01903/v1.3.2#"));
+                    writer.write_event(Event::Start(elem))?;
                 } else if capturing {
                     depth += 1;
-                }
-
-                if capturing {
                     writer.write_event(Event::Start(e.to_owned()))?;
                 }
             }
@@ -257,12 +262,14 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(writer.into_inner().into_inner())
 }
 
+/// Extracts the ICV (Invoice Counter Value) from invoice XML.
 pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
 
     let mut buf = Vec::with_capacity(1024);
-    let mut in_icv_block = false;
+    let mut in_id_element = false;
+    let mut icv_marker_found = false;
     let mut icv_value = String::new();
 
     loop {
@@ -272,19 +279,20 @@ pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
                 let tag = std::str::from_utf8(name.as_ref())?;
 
                 if tag == "ID" {
-                    in_icv_block = true;
+                    in_id_element = true;
                 }
             }
 
             Ok(Event::Text(e)) => {
-                if in_icv_block {
-                    let text = e.decode().context("failed to read ICV from invoice")?;
+                let text = e.decode().context("failed to read ICV from invoice")?;
+
+                if in_id_element {
                     if text == "ICV" {
-                        // Found ICV marker, next UUID will have the value
-                    } else if !text.is_empty() && icv_value.is_empty() {
-                        // This is the value we want
-                        icv_value = text.into_owned();
+                        icv_marker_found = true;
                     }
+                    in_id_element = false;
+                } else if icv_marker_found && icv_value.is_empty() && !text.is_empty() {
+                    icv_value = text.into_owned();
                 }
             }
 
@@ -294,7 +302,6 @@ pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
                     if !icv_value.is_empty() {
                         break;
                     }
-                    in_icv_block = false;
                 }
             }
 
@@ -315,6 +322,7 @@ pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
         .map_err(|_| anyhow::anyhow!("Invalid ICV value: {}", icv_value))
 }
 
+/// Extracts the customer's company ID (TIN) from invoice XML.
 pub fn extract_customer_id(invoice: &[u8]) -> anyhow::Result<String> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
@@ -347,9 +355,14 @@ pub fn extract_customer_id(invoice: &[u8]) -> anyhow::Result<String> {
                 }
             }
 
-            Ok(Event::End(_)) => current = 0,
+            Ok(Event::End(e)) => {
+                if e.local_name().as_ref() == b"AccountingCustomerParty" {
+                    in_accounting_customer_party = false;
+                }
+                current = 0;
+            }
             Ok(Event::Eof) => break,
-            Err(e) => panic!("XML error: {e}"),
+            Err(e) => bail!("XML error: {e}"),
             _ => {}
         }
         buf.clear();
@@ -357,6 +370,8 @@ pub fn extract_customer_id(invoice: &[u8]) -> anyhow::Result<String> {
 
     Ok(company_id)
 }
+
+/// Extracts the supplier's company ID (TIN) from invoice XML.
 pub fn extract_supplier_id(invoice: &[u8]) -> anyhow::Result<String> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
@@ -389,9 +404,14 @@ pub fn extract_supplier_id(invoice: &[u8]) -> anyhow::Result<String> {
                 }
             }
 
-            Ok(Event::End(_)) => current = 0,
+            Ok(Event::End(e)) => {
+                if e.local_name().as_ref() == b"AccountingSupplierParty" {
+                    in_accounting_supplier_party = false;
+                }
+                current = 0;
+            }
             Ok(Event::Eof) => break,
-            Err(e) => panic!("XML error: {e}"),
+            Err(e) => bail!("XML error: {e}"),
             _ => {}
         }
         buf.clear();
@@ -407,6 +427,7 @@ enum PihState {
     FoundPihBlock, // Confirmed this is the PIH block, looking for DigestValue
 }
 
+/// Extracts the PIH (Previous Invoice Hash) from invoice XML.
 pub fn extract_pih(invoice: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
@@ -481,6 +502,7 @@ enum ProfileState {
     InsideProfileId,
 }
 
+/// Extracts the profile ID (reporting or clearance) from invoice XML.
 pub fn extract_profile_id(invoice: &[u8]) -> anyhow::Result<String> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
@@ -616,6 +638,18 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_icv_with_other_ids_before() {
+        let xml = br#"<cac:Signature>
+        <cbc:ID>urn:oasis:names:specification:ubl:signature:Invoice</cbc:ID>
+    </cac:Signature>
+    <cac:AdditionalDocumentReference>
+        <cbc:ID>ICV</cbc:ID>
+        <cbc:UUID>42</cbc:UUID>
+    </cac:AdditionalDocumentReference>"#;
+        assert_eq!(extract_icv(xml).unwrap(), 42);
+    }
+
+    #[test]
     fn test_extract_pih() {
         let xml = br#"<cac:AdditionalDocumentReference>
         <cbc:ID>ICV</cbc:ID>
@@ -710,7 +744,7 @@ mod tests {
                                 </xades:SignedProperties>
                             </xades:QualifyingProperties>"#;
 
-        assert_eq!(extract_signed_properties(xml.as_ref()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties">
+        assert_eq!(extract_signed_properties(xml.as_ref()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
                                     <xades:SignedSignatureProperties>
                                         <xades:SigningTime>109384180981</xades:SigningTime> //the signging time (will change)
                                         <xades:SigningCertificate>

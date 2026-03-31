@@ -1,8 +1,9 @@
+use base64::{engine::general_purpose, Engine};
 
-use base64::{Engine, engine::general_purpose};
-
+/// Edits TLV-encoded QR code data by replacing hash and signature values.
+/// Returns the modified data as a base64-encoded string.
 pub fn edit_tlv(qr_b64: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<String> {
-    let bytes = general_purpose::STANDARD.decode(qr_b64).unwrap();
+    let bytes = general_purpose::STANDARD.decode(qr_b64)?;
     let mut records = extract_records(&bytes);
     for (tag, value) in records.iter_mut() {
         match tag {
@@ -14,6 +15,7 @@ pub fn edit_tlv(qr_b64: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<
     new_tlv(records)
 }
 
+/// Extracts TLV records from raw bytes. Returns a vector of (tag, value) tuples.
 pub fn extract_records(tlv_bytes: &[u8]) -> Vec<(u8, Vec<u8>)> {
     let mut pos = 0;
     let mut records = Vec::new();
@@ -23,20 +25,52 @@ pub fn extract_records(tlv_bytes: &[u8]) -> Vec<(u8, Vec<u8>)> {
         pos += 1;
 
         // Read length
-        let mut len = tlv_bytes[pos] as usize;
+        let len = tlv_bytes[pos] as usize;
         pos += 1;
-        if len == 0x81 {
-            len = tlv_bytes[pos] as usize;
-            pos += 1;
-        } else if len == 0x82 {
-            len = ((tlv_bytes[pos] as usize) << 8) | (tlv_bytes[pos + 1] as usize);
-            pos += 2;
-        }
 
-        // Read value
-        let value = tlv_bytes[pos..pos + len].to_vec();
-        pos += len;
-        records.push((tag, value));
+        // Handle long form lengths
+        if len > 0x80 {
+            if len == 0x81 {
+                // Length is in next byte
+                if pos >= tlv_bytes.len() {
+                    break;
+                }
+                let actual_len = tlv_bytes[pos] as usize;
+                pos += 1;
+
+                if pos + actual_len > tlv_bytes.len() {
+                    break;
+                }
+                let value = tlv_bytes[pos..pos + actual_len].to_vec();
+                pos += actual_len;
+                records.push((tag, value));
+            } else if len == 0x82 {
+                // Length is in next 2 bytes
+                if pos + 1 >= tlv_bytes.len() {
+                    break;
+                }
+                let actual_len = ((tlv_bytes[pos] as usize) << 8) | (tlv_bytes[pos + 1] as usize);
+                pos += 2;
+
+                if pos + actual_len > tlv_bytes.len() {
+                    break;
+                }
+                let value = tlv_bytes[pos..pos + actual_len].to_vec();
+                pos += actual_len;
+                records.push((tag, value));
+            } else {
+                // Invalid or unsupported long form
+                break;
+            }
+        } else {
+            // Short form length
+            if pos + len > tlv_bytes.len() {
+                break;
+            }
+            let value = tlv_bytes[pos..pos + len].to_vec();
+            pos += len;
+            records.push((tag, value));
+        }
     }
     records
 }
@@ -68,7 +102,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_edit_tlv() {
-       edit_tlv(
+        edit_tlv(
             b"AQtNeSBTdXBwbGllcgIJMTIzNDU2Nzg5AxoyMDI2LTAyLTI0VDAyOjU1OjI2LjM5NjM1OQQHMzAwMC4wMAUGNDUwLjAwBixINFRlZjBkd08vU3NvanpCRjI0ZUQ3VXIzcHREbFVEVGRZVE9ZQzNSOXpzPQeCAQAewh0lS1z7Jb3Jx7ns8zRuDTmge3VBVPITKezXc5u6Ps1BmsBBZxB3xf+8BSo1mBP2059opJxeJjoJ2AOEFzCts9XaPgjAMk4LMq5kyNGUUycAhF3KIndmG9NvjaklmUVzGhR0fJf2SBk0vrBcRQRojx3WuBQOUL/NOpnzztozdcjw29GoU6WgwZsm5nEd1YFZI9UAtQU6hWxxKz3rdw7+d5u6hKzMATuQ9E2ty0dDWMBDNvgAtW/CICKGPHlfFyUDMNi8JL/mmP51s0/oBMsyZt5pPw7sitKbIUsfviZPpAwCB0MSynWinOA7uQQuwrh6Te9wdF4TM9WZ8I10UXN8CIIDPjCCAzowggIioAMCAQICEDvu4yb8gD8n1LTTTO1gLoswDQYJKoZIhvcNAQELBQAwMTELMAkGA1UEBhMCU0QxDDAKBgNVBAoMA1NUQzEUMBIGA1UEAwwLU1RDIFJvb3QgQ0EwHhcNMjYwMjI0MDAyMTQyWhcNMjcwMjE1MDAyMTQyWjCBgDEXMBUGA1UEAwwOTXkuQ29tcGFueS5jb20xFTATBgNVBAoMDE9yZ2FuaXphdGlvbjELMAkGA1UECwwCSVQxCzAJBgNVBAYTAlNEMREwDwYDVQQIDAhLaGFydG91bTERMA8GA1UEBwwIS2hhcnRvdW0xDjAMBgNVBAUTBTI0NjAwMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAseCmzh40/09eNQEFPqOseZP1+AE9V/1DXi7fm0+bIYBCMIerOG+3MFl7tQrzAypcz30owIUYzTw7eYRqJ6BUeZ+iTZeEmtPJzeeppCfnyMExQId5nOWaPV3bK9YvwYSQXhVur0H3/ga0tTeboImjCfuCLiXYFLuzWfYhVnM3ZHAW9T7xGvG1SMAOnM9WQBlBvrHiiOcJ+JYKo1L4Qg7vn6ONUVsM6f8hBhkIBm+YH/t4Na1OM49nVzQAHo1fXKUlAOguiEgO2QiuEGBRyGCSqfq0L3dSA2WqGmfBDdG6txXabLhl498xx2tviBFRXCKKgO9Hj8+LSrzepWv16+pywQIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQAxvE7LuKQ/zQulttilllYezq2t2VPMSOxrg3QyEZxTsvxicRnM1WVKsG3BAJhAQVDl9Ey0lOhRE6Z11rSMYPLyTOhjKqHkWXRdnSCwb24E+MmXU1BD7HDDV/4Y150xO7OsEJV+xprbkaZEdX9ULSbjeMTLvVdlSe49HZ0ykUVbJ+wKHDZXx0rtmLvi2e9EyihZvfoONhNvwUF6nkjrT8naMFyr1U+Ms4sKE9wD/kZwvQEggsVsUyqdmF2pfzM/s/n3/rNVTDF+67RDqtU2yn9YBjKYTNLy44zI6w9nnf/+kGPtcrGNowrKDkvBfo1GoUz4SAhIo0g9Ge7Bo5NM8Rv+",&[0u8;9],&[0u8;9]
         ).unwrap();
         // let mut file = fs::File::create("test_result.json").unwrap();
