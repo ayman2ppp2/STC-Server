@@ -217,6 +217,7 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
                     depth = 1;
                     let mut elem = e.to_owned();
                     elem.push_attribute(("xmlns:xades", "http://uri.etsi.org/01903/v1.3.2#"));
+                    elem.push_attribute(("xmlns:ds", "http://www.w3.org/2000/09/xmldsig#"));
                     writer.write_event(Event::Start(elem))?;
                 } else if capturing {
                     depth += 1;
@@ -744,7 +745,7 @@ mod tests {
                                 </xades:SignedProperties>
                             </xades:QualifyingProperties>"#;
 
-        assert_eq!(extract_signed_properties(xml.as_ref()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#">
+        assert_eq!(extract_signed_properties(xml.as_ref()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
                                     <xades:SignedSignatureProperties>
                                         <xades:SigningTime>109384180981</xades:SigningTime> //the signging time (will change)
                                         <xades:SigningCertificate>
