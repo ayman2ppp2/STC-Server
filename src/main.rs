@@ -4,6 +4,7 @@ use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
 use sqlx::PgPool;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::routes::health_check::health_check;
 use crate::services::token_checking::cleanup_expired_tokens;
@@ -11,6 +12,16 @@ mod config;
 mod models;
 mod routes;
 mod services;
+
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("stc_server=warn"));
+
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(filter)
+        .init();
+}
 async fn hello() -> impl Responder {
     "Hello from STC Actix server!\n"
 }
@@ -39,6 +50,8 @@ async fn get_invoices(db: web::Data<PgPool>) -> impl Responder {
 // this is the main function
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    init_tracing();
+    
     // Render sets PORT env variable
     let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
@@ -74,7 +87,11 @@ async fn main() -> std::io::Result<()> {
         Ok(crypto_config) => crypto_config,
         Err(e) => panic!("Error in the reading of the crypto_config from env :{}", e),
     };
-    let validator = SchemaValidator::new().unwrap_or_else(|e| panic!("failed to obtain the schema validator path : {}",e));
+    let num_cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let pool_size = num_cpus * 2;
+    let validator = SchemaValidator::new(pool_size).unwrap_or_else(|e| panic!("failed to obtain the schema validator path : {}",e));
     let crypto_data = web::Data::new(crypto_config);
     let pool_data = web::Data::new(pool);
     let validator = web::Data::new(validator);

@@ -299,11 +299,10 @@ pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
 
             Ok(Event::End(e)) => {
                 let tag = e.local_name();
-                if tag.as_ref() == b"AdditionalDocumentReference" {
-                    if !icv_value.is_empty() {
+                if tag.as_ref() == b"AdditionalDocumentReference"
+                    && !icv_value.is_empty() {
                         break;
                     }
-                }
             }
 
             Ok(Event::Eof) => break,

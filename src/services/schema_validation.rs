@@ -1,22 +1,27 @@
+use crate::config::xsd_config::SchemaValidator;
 use anyhow::Result;
 use libxml::parser::Parser;
-use libxml::schemas::{SchemaParserContext, SchemaValidationContext};
-use crate::config::xsd_config::SchemaValidator;
 
 pub fn validate_schema(schema: &SchemaValidator, body: &str) -> Result<String> {
-    let xsd_path_str = schema.xsd_entry_path.to_str().unwrap_or_default();
+    let mut validation_context = schema
+        .get_context()
+        .ok_or_else(|| anyhow::anyhow!("Validation context pool exhausted"))?;
 
-    let mut parser_context = SchemaParserContext::from_file(xsd_path_str);
-    let mut validation_context = SchemaValidationContext::from_parser(&mut parser_context)
-        .map_err(|errors| anyhow::anyhow!("XSD parse failed: {:?}", errors))?;
+    let parse_result = (|| {
+        let doc = Parser::default()
+            .parse_string(body)
+            .map_err(|e| anyhow::anyhow!("XML syntax error: {}", e))?;
 
-    let doc = Parser::default()
-        .parse_string(body)
-        .map_err(|e| anyhow::anyhow!("XML syntax error: {}", e))?;
+        validation_context
+            .validate_document(&doc)
+            .map_err(|errors| anyhow::anyhow!("XSD validation failed: {:?}", errors))?;
 
-    validation_context
-        .validate_document(&doc)
-        .map_err(|errors| anyhow::anyhow!("XSD validation failed: {:?}", errors))?;
+        Ok::<(), anyhow::Error>(())
+    })();
+
+    schema.return_context(validation_context);
+
+    parse_result?;
 
     Ok("valid".to_string())
 }
