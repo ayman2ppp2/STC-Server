@@ -1,10 +1,18 @@
-
-use crate::{config::{db_config, xsd_config::SchemaValidator}, routes::{enroll::enroll, invoice_controller::{clearance, reporting}, on_boarding::on_board, token_generator::token_generator, verify_qr::verify_qr}};
+use crate::{
+    config::{db_config, xsd_config::{schema_validator_from_temp}},
+    routes::{
+        enroll::enroll,
+        invoice_controller::{clearance, reporting},
+        on_boarding::on_board,
+        token_generator::token_generator,
+        verify_qr::verify_qr,
+    },
+};
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 
 use config::crypto_config::Crypto;
 use sqlx::PgPool;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 use crate::routes::health_check::health_check;
 use crate::services::token_checking::cleanup_expired_tokens;
@@ -14,8 +22,8 @@ mod routes;
 mod services;
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("stc_server=warn"));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("stc_server=warn"));
 
     tracing_subscriber::registry()
         .with(fmt::layer())
@@ -47,11 +55,11 @@ async fn get_invoices(db: web::Data<PgPool>) -> impl Responder {
     }
 }
 
-// this is the main function
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     init_tracing();
-    
+
     // Render sets PORT env variable
     let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
@@ -60,8 +68,9 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Server running on port {}", port);
 
-    let pool = db_config::db_from_env().await
-        .unwrap_or_else(|e| panic!("Failed to connect to Postgres: {}",e));
+    let pool = db_config::db_from_env()
+        .await
+        .unwrap_or_else(|e| panic!("Failed to connect to Postgres: {}", e));
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -71,7 +80,7 @@ async fn main() -> std::io::Result<()> {
     // Spawn background task for token cleanup
     let cleanup_pool = pool.clone();
     tokio::spawn(async move {
-        use tokio::time::{interval, Duration};
+        use tokio::time::{Duration, interval};
         let mut cleanup_interval = interval(Duration::from_secs(3600));
         loop {
             cleanup_interval.tick().await;
@@ -87,17 +96,14 @@ async fn main() -> std::io::Result<()> {
         Ok(crypto_config) => crypto_config,
         Err(e) => panic!("Error in the reading of the crypto_config from env :{}", e),
     };
-    let num_cpus = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4);
-    let pool_size = num_cpus * 2;
-    let validator = SchemaValidator::new(pool_size).unwrap_or_else(|e| panic!("failed to obtain the schema validator path : {}",e));
+    let xsd_schema = schema_validator_from_temp()
+        .unwrap_or_else(|e| panic!("failed to obtain the XSD schema : {}", e));
     let crypto_data = web::Data::new(crypto_config);
     let pool_data = web::Data::new(pool);
-    let validator = web::Data::new(validator);
+    let xsd_schema = web::Data::new(xsd_schema);
     HttpServer::new(move || {
         App::new()
-            .app_data(validator.clone())
+            .app_data(xsd_schema.clone())
             .app_data(pool_data.clone())
             .app_data(crypto_data.clone())
             .app_data(web::JsonConfig::default().limit(256 * 1024))

@@ -1,7 +1,9 @@
+use actix_web::web::Data;
+use fastxml::schema::CompiledSchema;
 use sqlx::PgPool;
 
 use crate::{
-    config::{crypto_config::Crypto, xsd_config::SchemaValidator},
+    config::{crypto_config::Crypto},
     models::submit_invoice_dto::{IntermediateInvoiceDto, InvoiceType},
     services::{
         clear_invoice::clear_invoice,
@@ -18,7 +20,7 @@ pub async fn process_clearance(
     db_pool: &PgPool,
     crypto: &Crypto,
     sandbox: bool,
-    schema: &SchemaValidator,
+    schema: Data<CompiledSchema>,
     invoice_type: InvoiceType,
 ) -> anyhow::Result<String> {
     // Run shared pipeline

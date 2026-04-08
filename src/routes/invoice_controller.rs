@@ -1,10 +1,11 @@
 use actix_web::{HttpRequest, HttpResponse, web};
+use fastxml::schema::CompiledSchema;
 use serde_json::json;
 use sqlx::PgPool;
 use tracing::{info, error};
 
 use crate::{
-    config::{crypto_config::Crypto, xsd_config::SchemaValidator},
+    config::{crypto_config::Crypto},
     models::{responses::ApiResponse, submit_invoice_dto::{InvoiceType, SubmitInvoiceDto}},
     services::{clearance_service::process_clearance, reporting_service::process_reporting},
 };
@@ -14,7 +15,7 @@ pub async fn clearance(
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
-    schema_validator: web::Data<SchemaValidator>,
+    schema_validator: web::Data<CompiledSchema>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
     let dto = invoice_dto.into_inner();
@@ -34,7 +35,7 @@ pub async fn clearance(
         }
     };
 
-    match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator, InvoiceType::Clearance).await {
+    match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Clearance).await {
         Ok(cleared_invoice) => {
             info!(uuid = %uuid, endpoint = "/clear", "Clearance successful");
             Ok(HttpResponse::Ok().json(ApiResponse {
@@ -59,7 +60,7 @@ pub async fn reporting(
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
-    schema_validator: web::Data<SchemaValidator>,
+    schema_validator: web::Data<CompiledSchema>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
     let dto = invoice_dto.into_inner();
@@ -79,7 +80,7 @@ pub async fn reporting(
         }
     };
 
-    match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, &schema_validator, InvoiceType::Reporting).await {
+    match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Reporting).await {
         Ok(_) => {
             info!(uuid = %uuid, endpoint = "/report", "Reporting successful");
             Ok(HttpResponse::Ok().json(ApiResponse::<()> {

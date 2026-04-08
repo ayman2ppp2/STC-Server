@@ -1,9 +1,11 @@
+use actix_web::web::Data;
 use anyhow::{Context, bail};
+use fastxml::schema::CompiledSchema;
 use sqlx::PgPool;
 use tracing::{debug, error, info};
 
 use crate::{
-    config::{crypto_config::Crypto, xsd_config::SchemaValidator},
+    config::{crypto_config::Crypto},
     models::submit_invoice_dto::{IntermediateInvoiceDto, InvoiceType},
     services::{
         check_uuid::check_uuid, extractors::extract_customer_id, invoice_type_service::verify_invoice_type, pih_service::verify_pih, pki_service::{compute_hash, verfiy_supplier_tin_with_ca, verify_cert_with_ca, verify_signature_with_cert}, schema_validation::validate_schema, tin_service::{verify_customer_tin, verify_supplier_tin}
@@ -15,13 +17,13 @@ pub async fn validate_invoice(
     db_pool: &PgPool,
     crypto: &Crypto,
     sandbox: bool,
-    schema: &SchemaValidator,
+    schema: Data<CompiledSchema>,
     invoice_type: InvoiceType,
 ) -> anyhow::Result<()> {
     let uuid = &intermediate.uuid;
     let supplier_tin = &intermediate.supplier;
     
-    info!(uuid = %uuid, supplier_tin = %supplier_tin, invoice_type = ?invoice_type, sandbox, pool_size = schema.pool_size(), "Starting invoice validation");
+    info!(uuid = %uuid, supplier_tin = %supplier_tin, invoice_type = ?invoice_type, sandbox, "Starting invoice validation");
     
     // 1. Check UUID
     if !sandbox

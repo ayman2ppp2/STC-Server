@@ -1,7 +1,9 @@
+use actix_web::web::Data;
+use fastxml::schema::CompiledSchema;
 use sqlx::PgPool;
 
 use crate::{
-    config::{crypto_config::Crypto, xsd_config::SchemaValidator},
+    config::{crypto_config::Crypto},
     models::submit_invoice_dto::{IntermediateInvoiceDto, InvoiceType},
     services::{
         device_service::fetch_device_for_update,
@@ -18,7 +20,7 @@ pub async fn process_reporting(
     db_pool: &PgPool,
     crypto: &Crypto,
     sandbox: bool,
-    schema: &SchemaValidator,
+    schema: Data<CompiledSchema>,
     invoice_type: InvoiceType,
 ) -> anyhow::Result<()> {
     // Run shared pipeline
