@@ -1,6 +1,7 @@
 use actix_web::web::Data;
 use fastxml::schema::CompiledSchema;
 use sqlx::PgPool;
+use tracing::instrument;
 
 use crate::{
     config::{crypto_config::Crypto},
@@ -15,6 +16,7 @@ use crate::{
     },
 };
 
+#[instrument(skip_all)]
 pub async fn process_clearance(
     intermediate: IntermediateInvoiceDto,
     db_pool: &PgPool,

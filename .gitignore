@@ -6,6 +6,7 @@ test.xml
 response.json
 .vscode/launch.json
 .env
+.env.fish
 request.csr
 perf.data
 perf.data.old

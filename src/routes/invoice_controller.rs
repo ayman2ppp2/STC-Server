@@ -2,7 +2,6 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use fastxml::schema::CompiledSchema;
 use serde_json::json;
 use sqlx::PgPool;
-use tracing::{info, error};
 
 use crate::{
     config::{crypto_config::Crypto},
@@ -19,14 +18,10 @@ pub async fn clearance(
 ) -> Result<HttpResponse, actix_web::Error> {
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
     let dto = invoice_dto.into_inner();
-    let uuid = dto.uuid.clone();
-    
-    info!(uuid = %uuid, endpoint = "/clear", sandbox, "Received clearance request");
 
     let intermediate_dto = match dto.parse(&db_pool).await {
         Ok(dto) => dto,
         Err(e) => {
-            error!(uuid = %uuid, endpoint = "/clear", "Failed to parse invoice DTO: {}", e);
             return Ok(HttpResponse::BadRequest().json(ApiResponse {
                 success: false,
                 message: "Invalid invoice data".into(),
@@ -37,7 +32,6 @@ pub async fn clearance(
 
     match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Clearance).await {
         Ok(cleared_invoice) => {
-            info!(uuid = %uuid, endpoint = "/clear", "Clearance successful");
             Ok(HttpResponse::Ok().json(ApiResponse {
                 success: true,
                 message: "Invoice cleared".into(),
@@ -45,7 +39,6 @@ pub async fn clearance(
             }))
         }
         Err(e) => {
-            error!(uuid = %uuid, endpoint = "/clear", "Clearance failed: {}", e);
             Ok(HttpResponse::BadRequest().json(ApiResponse {
                 success: false,
                 message: "Clearance failed".into(),
@@ -64,14 +57,10 @@ pub async fn reporting(
 ) -> Result<HttpResponse, actix_web::Error> {
     let sandbox = req.headers().contains_key("X-Sandbox-Mode");
     let dto = invoice_dto.into_inner();
-    let uuid = dto.uuid.clone();
-    
-    info!(uuid = %uuid, endpoint = "/report", sandbox, "Received reporting request");
 
     let intermediate_dto = match dto.parse(&db_pool).await {
         Ok(dto) => dto,
         Err(e) => {
-            error!(uuid = %uuid, endpoint = "/report", "Failed to parse invoice DTO: {}", e);
             return Ok(HttpResponse::BadRequest().json(ApiResponse {
                 success: false,
                 message: "Invalid invoice data".into(),
@@ -82,7 +71,6 @@ pub async fn reporting(
 
     match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Reporting).await {
         Ok(_) => {
-            info!(uuid = %uuid, endpoint = "/report", "Reporting successful");
             Ok(HttpResponse::Ok().json(ApiResponse::<()> {
                 success: true,
                 message: "Invoice reported".into(),
@@ -90,7 +78,6 @@ pub async fn reporting(
             }))
         }
         Err(e) => {
-            error!(uuid = %uuid, endpoint = "/report", "Reporting failed: {}", e);
             Ok(HttpResponse::BadRequest().json(ApiResponse {
                 success: false,
                 message: "Reporting failed".into(),

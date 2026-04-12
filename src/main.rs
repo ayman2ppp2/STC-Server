@@ -9,25 +9,37 @@ use crate::{
     },
 };
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
+use tracing_actix_web::TracingLogger;
 
 use config::crypto_config::Crypto;
 use sqlx::PgPool;
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 use crate::routes::health_check::health_check;
 use crate::services::token_checking::cleanup_expired_tokens;
+use tracing::instrument;
 mod config;
 mod models;
 mod routes;
 mod services;
 
 fn init_tracing() {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("stc_server=warn"));
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+//test
+    let fmt_layer = fmt::layer()
+        .json()
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_thread_names(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_span_events(FmtSpan::FULL);
 
     tracing_subscriber::registry()
-        .with(fmt::layer())
         .with(filter)
+        .with(fmt_layer)
         .init();
 }
 async fn hello() -> impl Responder {
@@ -49,12 +61,27 @@ async fn get_invoices(db: web::Data<PgPool>) -> impl Responder {
     match result {
         Ok(invoices) => HttpResponse::Ok().json(invoices.len()),
         Err(e) => {
-            eprintln!("DB error: {:?}", e);
+            tracing::error!(?e, "DB error in get_invoices");
             HttpResponse::InternalServerError().body("Failed to fetch invoices")
         }
     }
 }
 
+#[instrument(skip(pool))]
+async fn token_cleanup_loop(pool: PgPool) {
+    use tokio::time::{Duration, interval};
+
+    let mut cleanup_interval = interval(Duration::from_secs(3600));
+    loop {
+        cleanup_interval.tick().await;
+
+        match cleanup_expired_tokens(&pool).await {
+            Ok(count) if count > 0 => tracing::info!(count, "Cleaned expired tokens"),
+            Ok(_) => {}
+            Err(e) => tracing::error!(%e, "Token cleanup failed"),
+        }
+    }
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -66,7 +93,7 @@ async fn main() -> std::io::Result<()> {
         .parse()
         .expect("PORT must be a number");
 
-    println!("🚀 Server running on port {}", port);
+    tracing::info!(port, "Server starting");
 
     let pool = db_config::db_from_env()
         .await
@@ -78,19 +105,7 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to run migrations");
 
     // Spawn background task for token cleanup
-    let cleanup_pool = pool.clone();
-    tokio::spawn(async move {
-        use tokio::time::{Duration, interval};
-        let mut cleanup_interval = interval(Duration::from_secs(3600));
-        loop {
-            cleanup_interval.tick().await;
-            match cleanup_expired_tokens(&cleanup_pool).await {
-                Ok(count) if count > 0 => println!("🧹 Cleaned {} expired tokens", count),
-                Ok(_) => {}
-                Err(e) => eprintln!("❌ Token cleanup failed: {}", e),
-            }
-        }
-    });
+    tokio::spawn(token_cleanup_loop(pool.clone()));
 
     let crypto_config = match Crypto::from_env().await {
         Ok(crypto_config) => crypto_config,
@@ -103,6 +118,7 @@ async fn main() -> std::io::Result<()> {
     let xsd_schema = web::Data::new(xsd_schema);
     HttpServer::new(move || {
         App::new()
+            .wrap(TracingLogger::default())
             .app_data(xsd_schema.clone())
             .app_data(pool_data.clone())
             .app_data(crypto_data.clone())

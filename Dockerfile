@@ -68,6 +68,7 @@ USER appuser
 
 # 6. CONFIGURATION
 ENV PORT=8000
+ENV RUST_LOG=warn
 EXPOSE ${PORT}
 
 # 7. EXEC FORM (Better for signals)

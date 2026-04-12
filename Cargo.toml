@@ -24,6 +24,8 @@ include_dir = "0.7"
 tempfile = "3.27"
 # libxml = "0.3.8"
 flamegraph = {version = "0.6.12", features = []}
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tracing = "0.1.44"
+tracing-actix-web = "0.7"
+tracing-attributes = "0.1"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 fastxml ="0.8.1"

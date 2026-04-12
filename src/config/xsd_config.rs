@@ -18,6 +18,6 @@ pub fn schema_validator_from_temp() -> anyhow::Result<CompiledSchema> {
         &fetcher,
     )
     .context("Failed to parse XSD with imports")?;
-    println!("XSD schema compiled successfully");
+    // println!("XSD schema compiled successfully");
     Ok(schema)
 }

@@ -2,15 +2,18 @@ use anyhow::Context;
 use openssl::x509::X509;
 use sqlx::PgPool;
 use sqlx::{types::time::OffsetDateTime, Postgres, Transaction};
+use tracing::instrument;
 use uuid::Uuid;
 use crate::{models::device::Device, services::pki_service::extract_device_id};
 
+#[instrument]
 pub async fn get_device(crt: &X509, pool: &PgPool) -> anyhow::Result<Device> {
     let device_id = extract_device_id(crt)?;
     let device = fetch_device(&device_id, pool).await?;
     Ok(device)
 }
 
+#[instrument(skip(pool), fields(device_uuid = %id))]
 pub async fn fetch_device(id: &Uuid, pool: &PgPool) -> anyhow::Result<Device> {
     sqlx::query_as!(
         Device,
@@ -26,6 +29,7 @@ pub async fn fetch_device(id: &Uuid, pool: &PgPool) -> anyhow::Result<Device> {
     .map_err(Into::into)
 }
 
+#[instrument(skip(tx), fields(device_uuid = %id))]
 pub async fn fetch_device_for_update<'a>(
     id: &Uuid,
     tx: &mut Transaction<'a, Postgres>,
@@ -44,6 +48,7 @@ pub async fn fetch_device_for_update<'a>(
     .await
     .map_err(Into::into)
 }
+#[instrument(skip(pool), fields(tin = %tin))]
 pub async fn create_new_device(
     device_uuid: &Uuid,
     tin: &str,
