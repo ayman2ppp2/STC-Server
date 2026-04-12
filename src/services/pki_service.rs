@@ -9,8 +9,10 @@ use openssl::hash::hash;
 use openssl::nid::Nid;
 use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
 use sqlx::PgPool;
+use tracing::instrument;
 use uuid::Uuid;
 
+#[instrument(skip(crypto, intermediate_dto))]
 pub async fn handle_enrollment(
     intermediate_dto: &IntermediateEnrollDto,
     crypto: &Crypto,
@@ -42,6 +44,7 @@ pub async fn handle_enrollment(
         .map_err(|e| anyhow!("failed to convert the certificate to a String : {}", e))
 }
 
+#[instrument(skip(crypto, intermediate_dto, pool))]
 pub async fn enroll_device(
     intermediate_dto: &IntermediateEnrollDto,
     crypto: &Crypto,

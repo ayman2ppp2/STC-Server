@@ -15,10 +15,11 @@ use crate::services::device_service::get_device;
 use crate::services::extractors::{extract_invoice, extract_sig_crt, extract_supplier_id};
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct SubmitInvoiceDto {
-    uuid: String,
-    invoice_hash: String,
-    invoice: String,
+    pub uuid: String,
+    pub invoice_hash: String,
+    pub invoice: String,
 }
+
 #[derive(Debug,PartialEq, Eq)]
 pub enum InvoiceType{
     Reporting,

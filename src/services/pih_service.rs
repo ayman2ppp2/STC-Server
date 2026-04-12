@@ -2,10 +2,12 @@ use anyhow::Context;
 use base64::{Engine, engine::general_purpose};
 use openssl::memcmp;
 use sqlx::PgPool;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::services::{extractors::extract_pih, pki_service::compute_hash};
 
+#[instrument(skip(pool), fields(device_uuid = %device_id))]
 pub async fn verify_pih(
     invoice: &[u8],
     pool: &PgPool,

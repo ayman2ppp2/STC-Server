@@ -6,7 +6,10 @@ use sqlx::PgPool;
 use crate::{
     config::crypto_config::Crypto,
     models::{enrollment_dto::EnrollDTO, responses::ApiResponse},
-    services::{pki_service::enroll_device, token_checking::{fetch_token, mark_token_used}},
+    services::{
+        pki_service::enroll_device,
+        token_checking::{fetch_token, mark_token_used},
+    },
 };
 
 pub async fn enroll(
@@ -43,26 +46,38 @@ pub async fn enroll(
     let stored_token_hash = match fetch_token(&intermediate_dto.token, &pool).await {
         Ok(token_hash) => token_hash,
         Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(ApiResponse::<serde_json::Value> {
+            return Ok(HttpResponse::InternalServerError().json(
+                ApiResponse::<serde_json::Value> {
                     success: false,
                     message: "Internal server error".to_string(),
                     data: Some(json!({ "details": e.to_string() })),
-                }),
-            );
+                },
+            ));
         }
     };
 
     match stored_token_hash {
         Some(token_hash) => {
             let token_bytes = intermediate_dto.token.as_bytes();
-            let computed_hash = crate::services::pki_service::compute_hash(token_bytes)
-                .map_err(|e| {
-                    actix_web::error::ErrorInternalServerError(format!("Hash error: {}", e))
-                })?;
+            let computed_hash = match crate::services::pki_service::compute_hash(token_bytes) {
+                Ok(hash) => hash,
+                Err(e) => {
+                    return Ok(HttpResponse::InternalServerError().json(ApiResponse {
+                        success: false,
+                        message: "Hash error".to_string(),
+                        data: Some(json!({"details" : e.to_string()})),
+                    }));
+                }
+            };
 
             if !memcmp::eq(&computed_hash, &token_hash) {
-                return Err(actix_web::error::ErrorBadRequest("token hash mismatch"));
+                return Ok(
+                    HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                        success: false,
+                        message: "token hash mismatch".to_string(),
+                        data: None,
+                    }),
+                );
             }
 
             match enroll_device(&intermediate_dto, crypto.get_ref(), &pool).await {
@@ -88,9 +103,9 @@ pub async fn enroll(
             }
         }
         None => Ok(HttpResponse::BadRequest().json(ApiResponse {
-                    success: false,
-                    message: "Enrollment failed".to_string(),
-                    data: Some(json!({"details" : "failed to find a valid token"})),
-                })),
+            success: false,
+            message: "Enrollment failed".to_string(),
+            data: Some(json!({"details" : "failed to find a valid token"})),
+        })),
     }
 }

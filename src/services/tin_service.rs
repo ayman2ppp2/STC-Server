@@ -1,6 +1,8 @@
 use anyhow::bail;
 use sqlx::PgPool;
+use tracing::instrument;
 
+#[instrument(skip(pool), fields(tin = %String::from_utf8_lossy(supplier_tin)))]
 pub async fn verify_supplier_tin(supplier_tin: &[u8],pool: &PgPool) -> anyhow::Result<()> {
     match check_supplier_tin(supplier_tin,pool).await {
         Ok(b) => match b {
@@ -12,6 +14,7 @@ pub async fn verify_supplier_tin(supplier_tin: &[u8],pool: &PgPool) -> anyhow::R
 
     Ok(())
 }
+#[instrument(skip(pool), fields(tin = %String::from_utf8_lossy(customer_tin)))]
 pub async fn verify_customer_tin(customer_tin:&[u8],pool: &PgPool) -> anyhow::Result<()> {
     match check_customer_tin(customer_tin,pool).await {
         Ok(b) => match b {

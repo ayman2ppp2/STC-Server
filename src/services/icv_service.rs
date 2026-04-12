@@ -1,6 +1,8 @@
 use sqlx::{Postgres, Transaction};
+use tracing::instrument;
 use uuid::Uuid;
 
+#[instrument(fields(expected_icv = current_icv + 1, received_icv = icv))]
 pub fn verify_icv(icv: i32, current_icv: i32) -> anyhow::Result<()> {
     if icv != current_icv + 1 {
         anyhow::bail!("ICV mismatch: expected {}, got {}", current_icv + 1, icv);
@@ -8,6 +10,7 @@ pub fn verify_icv(icv: i32, current_icv: i32) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[instrument(skip(tx), fields(device_uuid = %device_id, new_icv = new_icv))]
 pub async fn update_icv_and_pih<'a>(
     tx: &mut Transaction<'a, Postgres>,
     device_id: &Uuid,

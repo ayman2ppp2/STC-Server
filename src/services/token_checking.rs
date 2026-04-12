@@ -1,6 +1,8 @@
 use crate::services::pki_service::compute_hash;
 use sqlx::PgPool;
+use tracing::instrument;
 
+#[instrument(skip(pool))]
 pub async fn fetch_token(token: &str, pool: &PgPool) -> anyhow::Result<Option<Vec<u8>>> {
     let token_hash = compute_hash(token.as_bytes())?;
     let record = sqlx::query!(
@@ -19,6 +21,7 @@ pub async fn fetch_token(token: &str, pool: &PgPool) -> anyhow::Result<Option<Ve
     Ok(record.map(|r| r.token_hash))
 }
 
+#[instrument(skip(pool))]
 pub async fn mark_token_used(token_hash: &[u8], pool: &PgPool) -> anyhow::Result<()> {
     sqlx::query!(
         r#"
@@ -33,6 +36,7 @@ pub async fn mark_token_used(token_hash: &[u8], pool: &PgPool) -> anyhow::Result
     Ok(())
 }
 
+#[instrument(skip(pool), fields(company_id = %tin))]
 pub async fn validate_taxpayer_exists(tin: &str, pool: &PgPool) -> anyhow::Result<bool> {
     let exists = sqlx::query_scalar!(
         r#"
@@ -49,6 +53,7 @@ pub async fn validate_taxpayer_exists(tin: &str, pool: &PgPool) -> anyhow::Resul
     Ok(exists)
 }
 
+#[instrument(skip(pool))]
 pub async fn cleanup_expired_tokens(pool: &PgPool) -> anyhow::Result<u64> {
     let result = sqlx::query!(
         r#"

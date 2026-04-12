@@ -15,7 +15,7 @@ pub async fn db_from_env ()-> anyhow::Result<PgPool>{
     });
 
     // println!("PORT = {:?}", std::env::var("PORT"));
-    // println!("DATABASE_URL = {:?}", std::env::var("DATABASE_URL"));
+    // println!("DATABASE_URL = {:?}", database_url);
 
     Ok(PgPool::connect(&database_url)
         .await?)
