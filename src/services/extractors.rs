@@ -1,5 +1,6 @@
-use anyhow::{bail, Context};
-use quick_xml::{events::Event, Reader, Writer};
+use anyhow::{Context, bail};
+use openssl::bn::BigNum;
+use quick_xml::{Reader, Writer, events::Event};
 use std::io::Cursor;
 
 #[derive(PartialEq)]
@@ -299,10 +300,9 @@ pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
 
             Ok(Event::End(e)) => {
                 let tag = e.local_name();
-                if tag.as_ref() == b"AdditionalDocumentReference"
-                    && !icv_value.is_empty() {
-                        break;
-                    }
+                if tag.as_ref() == b"AdditionalDocumentReference" && !icv_value.is_empty() {
+                    break;
+                }
             }
 
             Ok(Event::Eof) => break,
@@ -321,7 +321,54 @@ pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
         .parse::<i32>()
         .map_err(|_| anyhow::anyhow!("Invalid ICV value: {}", icv_value))
 }
+pub fn extract_crt_serial(invoice: &[u8]) -> anyhow::Result<BigNum> {
+    let mut reader = Reader::from_reader(Cursor::new(invoice));
+    reader.config_mut().trim_text(true);
 
+    let mut buf = Vec::with_capacity(1024);
+    let mut in_serial_element = false;
+    let mut serial_value = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let name = e.local_name();
+                let tag = std::str::from_utf8(name.as_ref())?;
+
+                if tag == "X509SerialNumber" {
+                    in_serial_element = true;
+                }
+            }
+
+            Ok(Event::Text(e)) => {
+                let text = e
+                    .decode()
+                    .context("failed to read X509 serial from invoice")?;
+                if in_serial_element {
+                    serial_value = text.into_owned();
+                }
+            }
+
+            Ok(Event::End(e)) => {
+                let tag = e.local_name();
+                if tag.as_ref() == b"IssuerSerial" && !serial_value.is_empty() {
+                    break;
+                }
+            }
+
+            Ok(Event::Eof) => break,
+            Err(e) => return Err(anyhow::anyhow!("XML error: {e}")),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    if serial_value.is_empty() {
+        return Err(anyhow::anyhow!("X509 serial not found in invoice"));
+    }
+
+    BigNum::from_dec_str(&serial_value).context("Invalid X509 serial value")
+}
 /// Extracts the customer's company ID (TIN) from invoice XML.
 pub fn extract_customer_id(invoice: &[u8]) -> anyhow::Result<String> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
@@ -564,7 +611,31 @@ mod tests {
             profile_id
         )
     }
-
+    #[test]
+    fn test_extract_crt_serial(){
+        let xml = r#"        <xades:SignedSignatureProperties>
+          <xades:SigningTime>2026-03-18T20:08:12Z</xades:SigningTime>
+          <xades:SigningCertificate>
+            <xades:Cert>
+              <xades:CertDigest>
+                <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ds:DigestValue>4TqCEbiarikco5OGgTBOt3+6UI0UX/uqq4C7DH4xjw4=</ds:DigestValue>
+              </xades:CertDigest>
+              <xades:IssuerSerial>
+                <ds:X509IssuerName>C=SD, O=STC, CN=STC Root CA</ds:X509IssuerName>
+                <ds:X509SerialNumber>2824481994976419989</ds:X509SerialNumber>
+              </xades:IssuerSerial>
+            </xades:Cert>
+          </xades:SigningCertificate>
+        </xades:SignedSignatureProperties>
+      </xades:SignedProperties>
+    </xades:QualifyingProperties>
+  </ds:Object>
+</ds:Signature></sac:SignatureInformation></sig:UBLDocumentSignatures></ext:ExtensionContent></ext:UBLExtension></ext:UBLExtensions>"#;
+        
+    
+        assert_eq!(extract_crt_serial(xml.as_bytes()).unwrap(),BigNum::from_dec_str("2824481994976419989").unwrap());
+    }
     #[test]
     fn test_extract_reporting_profile() {
         let xml = create_invoice_xml("reporting:1.0");

@@ -4,7 +4,7 @@ use crate::services::device_service::create_new_device;
 use crate::services::signer::sign_csr;
 use crate::services::tin_service::verify_supplier_tin;
 use anyhow::{Context, anyhow};
-
+use openssl::bn::BigNum;
 use openssl::hash::hash;
 use openssl::nid::Nid;
 use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
@@ -130,4 +130,10 @@ pub fn verfiy_supplier_tin_with_ca(invoice_tin: &String, crt: &X509) -> anyhow::
         .context("Failed to parse ORGANIZATIONNAME as valid UTF-8")?
         .to_string();
     if *invoice_tin == crt_tin { Ok(())} else { Err(anyhow!("Supplier TIN mismatch expected : {}, found :{}",crt_tin,invoice_tin)) }
+}
+pub fn check_cert_serial(crt: &X509, extracted_serial: BigNum) -> anyhow::Result<bool> {
+    let serial = crt.serial_number();
+    let bn_serial = serial.to_bn()?;
+    
+    Ok(bn_serial == extracted_serial)
 }

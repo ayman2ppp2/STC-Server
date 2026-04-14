@@ -26,8 +26,7 @@ mod services;
 
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
-//test
+        .unwrap_or_else(|_| EnvFilter::new("warn"));
     let fmt_layer = fmt::layer()
         .json()
         .with_target(true)

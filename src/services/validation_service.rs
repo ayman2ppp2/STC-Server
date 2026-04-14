@@ -5,10 +5,10 @@ use sqlx::PgPool;
 use tracing::{error, instrument};
 
 use crate::{
-    config::{crypto_config::Crypto},
+    config::crypto_config::Crypto,
     models::submit_invoice_dto::{IntermediateInvoiceDto, InvoiceType},
     services::{
-        check_uuid::check_uuid, extractors::extract_customer_id, invoice_type_service::verify_invoice_type, pih_service::verify_pih, pki_service::{compute_hash, verfiy_supplier_tin_with_ca, verify_cert_with_ca, verify_signature_with_cert}, schema_validation::validate_schema, tin_service::{verify_customer_tin, verify_supplier_tin}
+        check_uuid::check_uuid, extractors::{extract_crt_serial, extract_customer_id}, invoice_type_service::verify_invoice_type, pih_service::verify_pih, pki_service::{check_cert_serial, compute_hash, verfiy_supplier_tin_with_ca, verify_cert_with_ca, verify_signature_with_cert}, schema_validation::validate_schema, tin_service::{verify_customer_tin, verify_supplier_tin}
     },
 };
 
@@ -31,6 +31,7 @@ pub async fn validate_invoice(
             return Err(e);
         }
 
+        check_cert_serial(&crypto.certificate, extract_crt_serial(&intermediate.invoice_bytes)?)?;
     // 2. Validate Schema
     let xml_body = std::str::from_utf8(&intermediate.invoice_bytes)
         .context("Invoice XML is not valid UTF-8")?;
