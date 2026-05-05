@@ -98,6 +98,7 @@ pub async fn validate_invoice(
     match invoice_type {
         InvoiceType::Reporting => {}
         InvoiceType::Clearance => {
+            // Extract customer TIN and verify it against the database
             let customer_id = extract_customer_id(&intermediate.invoice_bytes)?;
             if let Err(e) = verify_customer_tin(customer_id.as_bytes(), db_pool).await {
                 error!(uuid = %uuid, supplier_tin = %supplier_tin, customer_id = %customer_id, "Customer TIN not found in database: {}", e);

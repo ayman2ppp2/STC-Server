@@ -29,6 +29,13 @@ pub async fn clearance(
             }));
         }
     };
+    if !intermediate_dto.device.is_active {
+        return Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+            success: false,
+            message: "Device is not enabled".into(),
+            data: None,
+        }));
+    }
 
     match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Clearance).await {
         Ok(cleared_invoice) => {

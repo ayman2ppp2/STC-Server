@@ -38,7 +38,7 @@ pub async fn process_clearance(
         // Fetch device with lock to prevent race conditions
         let device = fetch_device_for_update(&intermediate.device.device_uuid, &mut tx).await?;
 
-        // Verify ICV hasn't changed since validation
+        // Verify ICV 
         let icv = extract_icv(&intermediate.invoice_bytes)?;
         verify_icv(icv, device.current_icv)?;
 
