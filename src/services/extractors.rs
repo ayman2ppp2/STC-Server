@@ -370,7 +370,7 @@ pub fn extract_crt_serial(invoice: &[u8]) -> anyhow::Result<BigNum> {
     BigNum::from_dec_str(&serial_value).context("Invalid X509 serial value")
 }
 /// Extracts the customer's company ID (TIN) from invoice XML.
-pub fn extract_customer_id(invoice: &[u8]) -> anyhow::Result<String> {
+pub fn extract_customer_tin(invoice: &[u8]) -> anyhow::Result<String> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));
     reader.config_mut().trim_text(true);
 
@@ -791,7 +791,7 @@ mod tests {
             </cac:PartyLegalEntity>
         </cac:Party>
     </cac:AccountingCustomerParty>"#;
-        assert_eq!(extract_customer_id(xml).unwrap(), "399999999800003")
+        assert_eq!(extract_customer_tin(xml).unwrap(), "399999999800003")
     }
     #[test]
     fn test_extract_signed_properties() {
