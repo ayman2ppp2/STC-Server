@@ -1,7 +1,7 @@
 use actix_web::{HttpResponse, web};
 
 
-use crate::{config::crypto_config::Crypto, models::qr_verification_model::{QrVerificationDto, QrVerificationRsponse}, services::verify_qr::verify_qr_signature};
+use crate::{config::crypto_config::Crypto, models::qr_verification::{QrVerificationDto, QrVerificationRsponse}, services::crypto::verify_qr::verify_qr_signature};
 
 
 pub async fn verify_qr(qr_dto : web::Json<QrVerificationDto>,crypto : web::Data<Crypto>)-> Result<HttpResponse, actix_web::Error> {

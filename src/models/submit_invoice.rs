@@ -10,9 +10,9 @@ use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::models::device::Device;
-use crate::services::c14n11::canonicalize_c14n11;
-use crate::services::device_service::get_device;
-use crate::services::extractors::{extract_invoice, extract_sig_crt, extract_supplier_id};
+use crate::services::xml::c14n11::canonicalize_c14n11;
+use crate::services::db::device_service::get_device;
+use crate::services::xml::extractors::{extract_invoice, extract_sig_crt, extract_supplier_id};
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct SubmitInvoiceDto {
     pub uuid: String,

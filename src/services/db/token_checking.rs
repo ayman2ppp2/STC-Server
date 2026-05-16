@@ -1,4 +1,4 @@
-use crate::services::pki_service::compute_hash;
+use crate::services::crypto::pki_service::compute_hash;
 use sqlx::PgPool;
 use tracing::instrument;
 
@@ -65,4 +65,20 @@ pub async fn cleanup_expired_tokens(pool: &PgPool) -> anyhow::Result<u64> {
     .execute(pool)
     .await?;
     Ok(result.rows_affected())
+}
+
+#[instrument(skip(pool))]
+pub async fn token_cleanup_loop(pool: PgPool) {
+    use tokio::time::{Duration, interval};
+
+    let mut cleanup_interval = interval(Duration::from_secs(3600));
+    loop {
+        cleanup_interval.tick().await;
+
+        match cleanup_expired_tokens(&pool).await {
+            Ok(count) if count > 0 => tracing::info!(count, "Cleaned expired tokens"),
+            Ok(_) => {}
+            Err(e) => tracing::error!(%e, "Token cleanup failed"),
+        }
+    }
 }

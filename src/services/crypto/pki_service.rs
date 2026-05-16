@@ -1,8 +1,11 @@
 use crate::config::crypto_config::Crypto;
-use crate::models::enrollment_dto::IntermediateEnrollDto;
-use crate::services::device_service::create_new_device;
-use crate::services::signer::sign_csr;
-use crate::services::tin_service::verify_supplier_tin;
+use crate::models::enrollment::IntermediateEnrollDto;
+use crate::services::db::device_service::create_new_device;
+
+use crate::services::crypto::signer::sign_csr;
+
+use crate::services::db::tin_service::verify_supplier_tin;
+use crate::services::db::token_checking::mark_token_used;
 use anyhow::{Context, anyhow};
 use openssl::bn::BigNum;
 use openssl::hash::hash;
@@ -49,6 +52,7 @@ pub async fn enroll_device(
     intermediate_dto: &IntermediateEnrollDto,
     crypto: &Crypto,
     pool: &PgPool,
+    stored_token_hash :&[u8],
 ) -> anyhow::Result<String> {
     let certificate = handle_enrollment(intermediate_dto, crypto).await?;
 
@@ -58,12 +62,13 @@ pub async fn enroll_device(
     let tin = intermediate_dto.get_tin()?;
     
     verify_supplier_tin(tin.as_bytes(), pool).await?;
+    mark_token_used(stored_token_hash, pool).await.context("failed to mark the token as used")?;
     create_new_device(&device_uuid, &tin, pool).await?;
 
     Ok(certificate)
 }
 
-// wite a function that gets submit_invoice certificate and then verifies it returning a bool
+// write a function that gets submit_invoice certificate and then verifies it returning a bool
 
 pub async fn verify_cert_with_ca(ca_crt: &X509, client_crt: &X509) -> anyhow::Result<bool> {
     let now = Asn1Time::days_from_now(0).context("failed to generate the time in the server")?;

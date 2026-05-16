@@ -5,9 +5,30 @@ use sqlx::PgPool;
 
 use crate::{
     config::{crypto_config::Crypto},
-    models::{responses::ApiResponse, submit_invoice_dto::{InvoiceType, SubmitInvoiceDto}},
-    services::{clearance_service::process_clearance, reporting_service::process_reporting},
+    models::{responses::ApiResponse, submit_invoice::{InvoiceType, SubmitInvoiceDto}},
+    services::{pipeline::clearance_service::process_clearance, pipeline::reporting_service::process_reporting},
 };
+
+pub async fn get_invoices(db: web::Data<PgPool>) -> impl actix_web::Responder {
+    let result = sqlx::query(
+        r#"
+        SELECT
+            *
+        FROM invoices
+        ORDER BY created_at DESC
+        "#,
+    )
+    .fetch_all(db.get_ref())
+    .await;
+
+    match result {
+        Ok(invoices) => HttpResponse::Ok().json(invoices.len()),
+        Err(e) => {
+            tracing::error!(?e, "DB error in get_invoices");
+            HttpResponse::InternalServerError().body("Failed to fetch invoices")
+        }
+    }
+}
 
 pub async fn clearance(
     req: HttpRequest,

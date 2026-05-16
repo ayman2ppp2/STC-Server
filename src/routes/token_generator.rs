@@ -4,8 +4,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    models::onboard_dto::{OnBoardResponseDto, OnboardDto},
-    services::{pki_service::compute_hash, token_checking::validate_taxpayer_exists},
+    models::onboard::{OnBoardResponseDto, OnboardDto},
+    services::{crypto::pki_service::compute_hash, db::token_checking::validate_taxpayer_exists},
 };
 
 use crate::models::responses::ApiResponse;
@@ -20,8 +20,8 @@ pub async fn token_generator(
         Ok(false) => {
             return Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                 success: false,
-                message: "Invalid company ID".to_string(),
-                data: Some(json!({"details": "Company ID not found in taxpayer registry"})),
+                message: "Invalid company TIN".to_string(),
+                data: Some(json!({"details": "Company TIN not found in taxpayer registry"})),
             }));
         }
         Err(e) => {

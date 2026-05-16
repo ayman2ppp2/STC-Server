@@ -6,18 +6,18 @@ use tracing::{error, instrument};
 
 use crate::{
     config::crypto_config::Crypto,
-    models::submit_invoice_dto::{IntermediateInvoiceDto, InvoiceType},
+    models::submit_invoice::{IntermediateInvoiceDto, InvoiceType},
     services::{
-        check_uuid::check_uuid,
-        extractors::{extract_crt_serial, extract_customer_tin},
-        invoice_type_service::verify_invoice_type,
-        pih_service::verify_pih,
-        pki_service::{
+        db::check_uuid::check_uuid,
+        xml::extractors::{extract_crt_serial, extract_customer_tin},
+        pipeline::invoice_type_service::verify_invoice_type,
+        db::pih_service::verify_pih,
+        crypto::pki_service::{
             check_cert_serial, compute_hash, verfiy_supplier_tin_with_ca, verify_cert_with_ca,
             verify_signature_with_cert,
         },
-        schema_validation::validate_schema,
-        tin_service::{verify_customer_tin, verify_supplier_tin},
+        xml::schema_validation::validate_schema,
+        db::tin_service::{verify_customer_tin, verify_supplier_tin},
     },
 };
 

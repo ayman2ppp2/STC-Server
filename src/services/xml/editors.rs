@@ -4,7 +4,7 @@ use quick_xml::events::{BytesText, Event};
 use quick_xml::{Reader, Writer};
 use std::io::Cursor;
 
-use crate::services::edit_tlv::edit_tlv;
+use crate::services::xml::edit_tlv::edit_tlv;
 
 /*
 1. Canonicalize invoice → hash invoice

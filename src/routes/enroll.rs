@@ -5,10 +5,10 @@ use sqlx::PgPool;
 
 use crate::{
     config::crypto_config::Crypto,
-    models::{enrollment_dto::EnrollDTO, responses::ApiResponse},
+    models::{enrollment::EnrollDTO, responses::ApiResponse},
     services::{
-        pki_service::enroll_device,
-        token_checking::{fetch_token, mark_token_used},
+        crypto::pki_service::enroll_device,
+        db::token_checking::fetch_token,
     },
 };
 
@@ -57,9 +57,9 @@ pub async fn enroll(
     };
 
     match stored_token_hash {
-        Some(token_hash) => {
+        Some(stored_token_hash) => {
             let token_bytes = intermediate_dto.token.as_bytes();
-            let computed_hash = match crate::services::pki_service::compute_hash(token_bytes) {
+            let computed_hash = match crate::services::crypto::pki_service::compute_hash(token_bytes) {
                 Ok(hash) => hash,
                 Err(e) => {
                     return Ok(HttpResponse::InternalServerError().json(ApiResponse {
@@ -70,7 +70,7 @@ pub async fn enroll(
                 }
             };
 
-            if !memcmp::eq(&computed_hash, &token_hash) {
+            if !memcmp::eq(&computed_hash, &stored_token_hash) {
                 return Ok(
                     HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                         success: false,
@@ -80,15 +80,15 @@ pub async fn enroll(
                 );
             }
 
-            match enroll_device(&intermediate_dto, crypto.get_ref(), &pool).await {
+            match enroll_device(&intermediate_dto, crypto.get_ref(), &pool,&stored_token_hash).await {
                 Ok(crt) => {
-                    if let Err(e) = mark_token_used(&token_hash, &pool).await {
-                        return Ok(HttpResponse::InternalServerError().json(ApiResponse {
-                            success: false,
-                            message: "Enrollment succeeded but failed to mark token".to_string(),
-                            data: Some(json!({"details" : e.to_string()})),
-                        }));
-                    }
+                    // if let Err(e) = mark_token_used(&stored_token_hash, &pool).await {
+                    //     return Ok(HttpResponse::InternalServerError().json(ApiResponse {
+                    //         success: false,
+                    //         message: "Enrollment succeeded but failed to mark token".to_string(),
+                    //         data: Some(json!({"details" : e.to_string()})),
+                    //     }));
+                    // }
                     Ok(HttpResponse::Ok().json(ApiResponse {
                         success: true,
                         message: "enrolled".to_string(),

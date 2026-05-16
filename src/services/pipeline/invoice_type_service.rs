@@ -1,6 +1,6 @@
 use anyhow::bail;
 
-use crate::{models::submit_invoice_dto::InvoiceType, services::extractors::extract_profile_id};
+use crate::{models::submit_invoice::InvoiceType, services::xml::extractors::extract_profile_id};
 
 pub fn verify_invoice_type(
     invoice_bytes: &[u8],
