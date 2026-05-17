@@ -2,7 +2,7 @@ use sqlx::{Postgres, Transaction};
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::models::submit_invoice_dto::InvoiceType;
+use crate::models::submit_invoice::InvoiceType;
 
 #[instrument(skip(tx), fields(uuid = %uuid, device_uuid = %device_id))]
 pub async fn save_invoice<'a>(

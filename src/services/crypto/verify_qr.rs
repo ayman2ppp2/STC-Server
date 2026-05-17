@@ -3,7 +3,7 @@ use tracing::instrument;
 
 use crate::{
     config::crypto_config::Crypto,
-    services::{edit_tlv::extract_records, pki_service::verify_signature_with_cert},
+    services::{xml::edit_tlv::extract_records, crypto::pki_service::verify_signature_with_cert},
 };
 
 #[instrument(skip(crypto), fields(qr_length = qr_b64.len()))]

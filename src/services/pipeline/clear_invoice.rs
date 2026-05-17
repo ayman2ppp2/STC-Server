@@ -11,13 +11,13 @@ use base64::{Engine, engine::general_purpose};
 
 use crate::{
     config::crypto_config::Crypto,
-    models::submit_invoice_dto::IntermediateInvoiceDto,
+    models::submit_invoice::IntermediateInvoiceDto,
     services::{
-        c14n11::canonicalize_c14n11,
-        editors::{edit_qr, edit_signature, edit_signed_info, edit_signing_time},
-        extractors::extract_signed_properties,
-        pki_service::compute_hash,
-        signer::sign,
+        xml::c14n11::canonicalize_c14n11,
+        xml::editors::{edit_qr, edit_signature, edit_signed_info, edit_signing_time},
+        xml::extractors::extract_signed_properties,
+        crypto::pki_service::compute_hash,
+        crypto::pki_service::sign,
     },
 };
 

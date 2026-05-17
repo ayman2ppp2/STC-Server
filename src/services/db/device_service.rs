@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use sqlx::{types::time::OffsetDateTime, Postgres, Transaction};
 use tracing::instrument;
 use uuid::Uuid;
-use crate::{models::device::Device, services::pki_service::extract_device_id};
+use crate::{models::device::Device, services::crypto::pki_service::extract_device_id};
 
 #[instrument]
 pub async fn get_device(crt: &X509, pool: &PgPool) -> anyhow::Result<Device> {

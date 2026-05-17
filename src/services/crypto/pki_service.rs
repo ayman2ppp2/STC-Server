@@ -1,14 +1,12 @@
 use crate::config::crypto_config::Crypto;
-use crate::models::enrollment_dto::IntermediateEnrollDto;
-use crate::services::device_service::create_new_device;
-use crate::services::signer::sign_csr;
-use crate::services::tin_service::verify_supplier_tin;
-use anyhow::{Context, anyhow};
+use crate::models::enrollment::IntermediateEnrollDto;
 
+
+use anyhow::{Context, anyhow};
+use openssl::bn::BigNum;
 use openssl::hash::hash;
 use openssl::nid::Nid;
-use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::Verifier, x509::X509};
-use sqlx::PgPool;
+use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::{Signer, Verifier}, x509::{X509, X509Builder, X509Req}};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -43,27 +41,6 @@ pub async fn handle_enrollment(
     String::from_utf8(certificate)
         .map_err(|e| anyhow!("failed to convert the certificate to a String : {}", e))
 }
-
-#[instrument(skip(crypto, intermediate_dto, pool))]
-pub async fn enroll_device(
-    intermediate_dto: &IntermediateEnrollDto,
-    crypto: &Crypto,
-    pool: &PgPool,
-) -> anyhow::Result<String> {
-    let certificate = handle_enrollment(intermediate_dto, crypto).await?;
-
-    let device_id_str = intermediate_dto.get_device_id()?;
-    let device_uuid = Uuid::parse_str(&device_id_str)
-        .context("Failed to parse device ID as UUID")?;
-    let tin = intermediate_dto.get_tin()?;
-    
-    verify_supplier_tin(tin.as_bytes(), pool).await?;
-    create_new_device(&device_uuid, &tin, pool).await?;
-
-    Ok(certificate)
-}
-
-// wite a function that gets submit_invoice certificate and then verifies it returning a bool
 
 pub async fn verify_cert_with_ca(ca_crt: &X509, client_crt: &X509) -> anyhow::Result<bool> {
     let now = Asn1Time::days_from_now(0).context("failed to generate the time in the server")?;
@@ -130,4 +107,38 @@ pub fn verfiy_supplier_tin_with_ca(invoice_tin: &String, crt: &X509) -> anyhow::
         .context("Failed to parse ORGANIZATIONNAME as valid UTF-8")?
         .to_string();
     if *invoice_tin == crt_tin { Ok(())} else { Err(anyhow!("Supplier TIN mismatch expected : {}, found :{}",crt_tin,invoice_tin)) }
+}
+pub fn check_cert_serial(crt: &X509, extracted_serial: BigNum) -> anyhow::Result<bool> {
+    let serial = crt.serial_number();
+    let bn_serial = serial.to_bn()?;
+    
+    Ok(bn_serial == extracted_serial)
+}
+
+pub async fn sign_csr(req: &X509Req, crypto: &Crypto) -> Result<X509, openssl::error::ErrorStack> {
+    let mut builder = X509Builder::new()?;
+    builder.set_version(2)?;
+    let mut serial = BigNum::new()?;
+    serial.rand(128, openssl::bn::MsbOption::MAYBE_ZERO, false)?;
+    let serial = serial.to_asn1_integer()?;
+    builder.set_serial_number(&serial)?;
+    builder.set_subject_name(req.subject_name())?;
+    builder.set_issuer_name(crypto.certificate.issuer_name())?;
+    let pubkey = req.public_key()?;
+    builder.set_pubkey(&pubkey)?;
+    let validty_in = Asn1Time::days_from_now(0)?;
+    let validty_expr = Asn1Time::days_from_now(356)?;
+    builder.set_not_before(&validty_in)?;
+    builder.set_not_after(&validty_expr)?;
+
+    builder.sign(&crypto.private_key, MessageDigest::sha256())?;
+
+    Ok(builder.build())
+}
+
+pub fn sign(hash: Vec<u8>, crypto: &Crypto) -> anyhow::Result<Vec<u8>> {
+    let mut signer = Signer::new(MessageDigest::sha256(), &crypto.private_key)?;
+    signer.update(&hash)?;
+    let signature = signer.sign_to_vec()?;
+    Ok(signature)
 }
