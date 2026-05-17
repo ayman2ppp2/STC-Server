@@ -1,6 +1,6 @@
 use actix_web::{HttpResponse, web};
-use serde_json::json;
 use sqlx::PgPool;
+use tracing;
 
 use crate::{
     config::crypto_config::Crypto,
@@ -16,11 +16,12 @@ pub async fn enroll(
     let intermediate_dto = match dto.into_inner().parse() {
         Ok(intermediate) => intermediate,
         Err(e) => {
+            tracing::error!(error = %e, "CSR parse failed in enrollment");
             return Ok(
                 HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                     success: false,
                     message: "CSR Parsing Error".to_string(),
-                    data: Some(json!({"details": e.to_string()})),
+                    data: None,
                 }),
             );
         }
@@ -30,14 +31,14 @@ pub async fn enroll(
         Ok(crt) => Ok(HttpResponse::Ok().json(ApiResponse {
             success: true,
             message: "enrolled".to_string(),
-            data: Some(json!({"certificate": crt})),
+            data: Some(serde_json::json!({"certificate": crt})),
         })),
         Err(e) => {
-            let msg = e.to_string();
-            let status = if msg.contains("not found or expired") || msg.contains("hash mismatch")
+            tracing::error!(error = %e, "Enrollment failed");
+            let status = if e.to_string().contains("not found or expired") || e.to_string().contains("hash mismatch")
             {
                 "Invalid or expired token"
-            } else if msg.contains("Supplier TIN not found in database") {
+            } else if e.to_string().contains("Supplier TIN not found in database") {
                 "Supplier TIN not registered"
             } else {
                 "Enrollment failed"
@@ -45,7 +46,7 @@ pub async fn enroll(
             Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                 success: false,
                 message: status.to_string(),
-                data: Some(json!({"details": msg})),
+                data: None,
             }))
         }
     }

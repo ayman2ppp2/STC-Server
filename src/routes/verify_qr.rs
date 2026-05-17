@@ -1,5 +1,5 @@
 use actix_web::{HttpResponse, web};
-use serde_json::json;
+use tracing;
 
 use crate::{
     config::crypto_config::Crypto,
@@ -17,10 +17,13 @@ pub async fn verify_qr(
             message: "verfied".into(),
             data: None,
         })),
-        Err(e) => Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-            success: false,
-            message: "QR verification failed".into(),
-            data: Some(json!({"details": e.to_string()})),
-        })),
+        Err(e) => {
+            tracing::error!(error = %e, "QR verification failed");
+            Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                success: false,
+                message: "QR verification failed".into(),
+                data: None,
+            }))
+        },
     }
 }
