@@ -17,7 +17,7 @@ use crate::{
         xml::editors::{edit_qr, edit_signature, edit_signed_info, edit_signing_time},
         xml::extractors::extract_signed_properties,
         crypto::pki_service::compute_hash,
-        crypto::signer::sign,
+        crypto::pki_service::sign,
     },
 };
 

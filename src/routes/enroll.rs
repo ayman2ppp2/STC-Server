@@ -1,15 +1,11 @@
 use actix_web::{HttpResponse, web};
-use openssl::memcmp;
 use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
     config::crypto_config::Crypto,
     models::{enrollment::EnrollDTO, responses::ApiResponse},
-    services::{
-        crypto::pki_service::enroll_device,
-        db::token_checking::fetch_token,
-    },
+    services::pipeline::enrollment_service,
 };
 
 pub async fn enroll(
@@ -24,88 +20,33 @@ pub async fn enroll(
                 HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                     success: false,
                     message: "CSR Parsing Error".to_string(),
-                    data: Some(json!({"details":e.to_string()})),
+                    data: Some(json!({"details": e.to_string()})),
                 }),
             );
         }
     };
 
-    let _extracted_device_id = match intermediate_dto.get_device_id() {
-        Ok(id) => id,
-        Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Failed to fetch the device id".to_string(),
-                    data: Some(json!({"details":e.to_string()})),
-                }),
-            );
-        }
-    };
-
-    let stored_token_hash = match fetch_token(&intermediate_dto.token, &pool).await {
-        Ok(token_hash) => token_hash,
-        Err(e) => {
-            return Ok(HttpResponse::InternalServerError().json(
-                ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Internal server error".to_string(),
-                    data: Some(json!({ "details": e.to_string() })),
-                },
-            ));
-        }
-    };
-
-    match stored_token_hash {
-        Some(stored_token_hash) => {
-            let token_bytes = intermediate_dto.token.as_bytes();
-            let computed_hash = match crate::services::crypto::pki_service::compute_hash(token_bytes) {
-                Ok(hash) => hash,
-                Err(e) => {
-                    return Ok(HttpResponse::InternalServerError().json(ApiResponse {
-                        success: false,
-                        message: "Hash error".to_string(),
-                        data: Some(json!({"details" : e.to_string()})),
-                    }));
-                }
-            };
-
-            if !memcmp::eq(&computed_hash, &stored_token_hash) {
-                return Ok(
-                    HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                        success: false,
-                        message: "token hash mismatch".to_string(),
-                        data: None,
-                    }),
-                );
-            }
-
-            match enroll_device(&intermediate_dto, crypto.get_ref(), &pool,&stored_token_hash).await {
-                Ok(crt) => {
-                    // if let Err(e) = mark_token_used(&stored_token_hash, &pool).await {
-                    //     return Ok(HttpResponse::InternalServerError().json(ApiResponse {
-                    //         success: false,
-                    //         message: "Enrollment succeeded but failed to mark token".to_string(),
-                    //         data: Some(json!({"details" : e.to_string()})),
-                    //     }));
-                    // }
-                    Ok(HttpResponse::Ok().json(ApiResponse {
-                        success: true,
-                        message: "enrolled".to_string(),
-                        data: Some(json!({"certificate": crt,})),
-                    }))
-                }
-                Err(e) => Ok(HttpResponse::BadRequest().json(ApiResponse {
-                    success: false,
-                    message: "Enrollment failed".to_string(),
-                    data: Some(json!({"details" : e.to_string()})),
-                })),
-            }
-        }
-        None => Ok(HttpResponse::BadRequest().json(ApiResponse {
-            success: false,
-            message: "Enrollment failed".to_string(),
-            data: Some(json!({"details" : "failed to find a valid token"})),
+    match enrollment_service::enroll_device(&intermediate_dto, crypto.get_ref(), &pool).await {
+        Ok(crt) => Ok(HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            message: "enrolled".to_string(),
+            data: Some(json!({"certificate": crt})),
         })),
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("not found or expired") || msg.contains("hash mismatch")
+            {
+                "Invalid or expired token"
+            } else if msg.contains("Supplier TIN not found in database") {
+                "Supplier TIN not registered"
+            } else {
+                "Enrollment failed"
+            };
+            Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                success: false,
+                message: status.to_string(),
+                data: Some(json!({"details": msg})),
+            }))
+        }
     }
 }

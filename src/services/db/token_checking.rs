@@ -1,10 +1,8 @@
-use crate::services::crypto::pki_service::compute_hash;
 use sqlx::PgPool;
 use tracing::instrument;
 
 #[instrument(skip(pool))]
-pub async fn fetch_token(token: &str, pool: &PgPool) -> anyhow::Result<Option<Vec<u8>>> {
-    let token_hash = compute_hash(token.as_bytes())?;
+pub async fn fetch_token(token_hash: &[u8], pool: &PgPool) -> anyhow::Result<Option<Vec<u8>>> {
     let record = sqlx::query!(
         r#"
     SELECT token_hash as "token_hash!"
