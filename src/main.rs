@@ -79,7 +79,9 @@ async fn main() -> std::io::Result<()> {
             .route("/enroll", web::post().to(enroll))
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))
-            .route("/get_invoices", web::get().to(get_invoices))
+            .route("/get_invoices", web::get().to(get_invoices)) 
+            // https://stc-server.onrender.com/clear
+            // https://stc-server.onrender.com/report
             .route("/verify_qr", web::post().to(verify_qr))
     })
     .bind(("0.0.0.0", port))?

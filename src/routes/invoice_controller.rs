@@ -77,7 +77,7 @@ pub async fn clearance(
             Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                 success: false,
                 message: "Clearance failed".into(),
-                data: None,
+                data: Some(json!({"error": e.to_string()})),
             }))
         }
     }

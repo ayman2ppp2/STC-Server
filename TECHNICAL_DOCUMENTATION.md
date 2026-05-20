@@ -59,6 +59,8 @@ The STC Server uses a **two-step enrollment process** to authenticate devices:
 
 ### Step 1: Generate Enrollment Token
 
+The token can be generated either via the government-style onboarding portal at `GET /onboard` or programmatically:
+
 ```
 Client: POST /onboard
   { "name": "Company", "email": "email@example.com", "company_id": "TIN" }
@@ -70,6 +72,9 @@ Server: 200 OK
 **Requirements:**
 - `company_id` must be a valid TIN registered in the `taxpayers` table
 - Token expires after **5 minutes**
+
+**Onboarding Portal (`GET /onboard`):**
+A government-themed HTML form served at the root onboarding URL. Includes fields for Full Name, Email, Company ID/TIN, and an OTP field (placeholder — OTP validation is not yet implemented server-side). The form POSTs to `/onboard` with `name`, `email`, and `company_id` to generate the token.
 
 ### Step 2: Enroll Device with CSR
 
@@ -120,13 +125,13 @@ GET /health_check
 
 ---
 
-### 2. Generate Enrollment Token
+### 2. Onboarding Portal
 
 ```
 GET /onboard
 ```
 
-Serves an HTML form for manual token generation.
+Serves a government-themed HTML onboarding portal with fields for Full Name, Email Address, Company ID/TIN, and OTP (placeholder). The form submits to `POST /onboard`.
 
 ---
 
@@ -163,7 +168,7 @@ Content-Type: application/json
 {
   "success": false,
   "message": "Invalid company ID",
-  "data": { "details": "Company ID not found in taxpayer registry" }
+  "data": null
 }
 ```
 
@@ -200,7 +205,7 @@ Content-Type: application/json
 {
   "success": false,
   "message": "Enrollment failed",
-  "data": { "details": "error description" }
+  "data": null
 }
 ```
 
@@ -239,7 +244,7 @@ X-Sandbox-Mode: true   (optional - skip validation)
 {
   "success": false,
   "message": "Clearance failed",
-  "data": { "details": "error description" }
+  "data": null
 }
 ```
 
@@ -428,11 +433,11 @@ X-Sandbox-Mode: true
 {
   "success": false,
   "message": "Clearance failed",
-  "data": {
-    "details": "Detailed error message"
-  }
+  "data": null
 }
 ```
+
+**Note:** Error details are logged server-side with request context (`uuid`, `device_uuid`). The `data` field is always `null` on error — no internal error messages are exposed to the client.
 
 ---
 
@@ -515,7 +520,7 @@ class STCClient:
         data = response.json()
         
         if not data.get("success"):
-            raise Exception(f"Clearance failed: {data.get('data', {}).get('details')}")
+            raise Exception(f"Clearance failed: {data.get('message', 'Unknown error')}")
         
         cleared = data["data"]["cleared_invoice"]
         return base64.b64decode(cleared)
@@ -618,7 +623,7 @@ class STCClient {
     }, { headers });
 
     if (!response.data.success) {
-      throw new Error(`Clearance failed: ${response.data.data.details}`);
+      throw new Error(`Clearance failed: ${response.data.message}`);
     }
 
     return Buffer.from(response.data.data.cleared_invoice, 'base64');
@@ -718,7 +723,7 @@ impl STCClient {
         let response = request.send().await?.json::<ApiResponse<ClearanceData>>().await?;
 
         if !response.success {
-            return Err(response.data.map(|d| d.details.into()).unwrap_or("Unknown error".into()));
+            return Err("Clearance failed".into());
         }
 
         Ok(BASE64.decode(response.unwrap().cleared_invoice)?)
@@ -728,7 +733,6 @@ impl STCClient {
 #[derive(Deserialize)]
 struct ClearanceData {
     cleared_invoice: String,
-    details: Option<String>,
 }
 ```
 

@@ -15,7 +15,7 @@ use crate::{
     services::{
         xml::c14n11::canonicalize_c14n11,
         xml::editors::{edit_qr, edit_signature, edit_signed_info, edit_signing_time},
-        xml::extractors::extract_signed_properties,
+        xml::extractors::{extract_signed_info, extract_signed_properties},
         crypto::pki_service::compute_hash,
         crypto::pki_service::sign,
     },
@@ -40,7 +40,7 @@ pub fn clear_invoice(
         &signed_properties_hash,
     )?;
     // compute hash for the edited signed info
-    let signed_info_hash = compute_hash(&canonicalize_c14n11(extract_signed_properties(
+    let signed_info_hash = compute_hash(&canonicalize_c14n11(extract_signed_info(
         &edited_signed_info_invoice_bytes,
     )?)?)?;
     // let edited_qr_invoice_bytes = edit_qr(invoice_hash,signature);

@@ -1,344 +1,334 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tax Authority &ndash; Device Onboarding Portal</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #eef0f5;
-            color: #1e293b;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* ── Header ── */
-        .header {
-            background: #14273e;
-            color: #fff;
-            padding: 1.25rem 2rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            border-bottom: 3px solid #c8a84e;
-        }
-        .header .crest {
-            flex-shrink: 0;
-        }
-        .header .title-block {
-            line-height: 1.3;
-        }
-        .header .title-block .ministry {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            opacity: 0.8;
-        }
-        .header .title-block .agency {
-            font-size: 1.15rem;
-            font-weight: 600;
-        }
-
-        /* ── Main ── */
-        .main {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 2rem 1rem;
-        }
-
-        .card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            width: 100%;
-            max-width: 480px;
-            padding: 2rem 2rem 1.75rem;
-        }
-        .card h2 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 0.35rem;
-        }
-        .card .subtitle {
-            font-size: 0.85rem;
-            color: #64748b;
-            margin-bottom: 1.5rem;
-        }
-
-        /* ── Form ── */
-        .form-group {
-            margin-bottom: 1.15rem;
-        }
-        .form-group label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 0.3rem;
-            color: #334155;
-        }
-        .form-group label .required {
-            color: #b91c1c;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 0.6rem 0.75rem;
-            font-size: 0.95rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 5px;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            background: #fafbfc;
-        }
-        .form-group input:focus {
-            border-color: #2c6faa;
-            box-shadow: 0 0 0 3px rgba(44,111,170,0.15);
-            background: #fff;
-        }
-        .form-group .hint {
-            font-size: 0.78rem;
-            color: #64748b;
-            margin-top: 0.25rem;
-        }
-        .form-group .hint code {
-            background: #f1f5f9;
-            padding: 0.05rem 0.4rem;
-            border-radius: 3px;
-            font-size: 0.75rem;
-        }
-
-        /* ── Button ── */
-        .btn-submit {
-            width: 100%;
-            padding: 0.7rem;
-            font-size: 1rem;
-            font-weight: 600;
-            color: #fff;
-            background: #14273e;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 0.5rem;
-        }
-        .btn-submit:hover { background: #1e3a5c; }
-        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* ── Loading ── */
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            color: #475569;
-        }
-        .loading::after {
-            content: '';
-            display: inline-block;
-            width: 1rem;
-            height: 1rem;
-            margin-left: 0.5rem;
-            border: 2px solid #cbd5e1;
-            border-top-color: #14273e;
-            border-radius: 50%;
-            animation: spin 0.7s linear infinite;
-            vertical-align: middle;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ── Result ── */
-        #result { margin-top: 1rem; }
-
-        .alert {
-            padding: 0.85rem 1rem;
-            border-radius: 5px;
-            font-size: 0.9rem;
-            line-height: 1.4;
-        }
-        .alert-success {
-            background: #f0fdf4;
-            border: 1px solid #86efac;
-            color: #166534;
-        }
-        .alert-error {
-            background: #fef2f2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
-        }
-
-        .token-box {
-            background: #f8fafc;
-            border: 1px dashed #94a3b8;
-            border-radius: 5px;
-            padding: 0.85rem 1rem;
-            margin-top: 0.75rem;
-            word-break: break-all;
-            font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-            font-size: 0.85rem;
-            color: #0f172a;
-            position: relative;
-        }
-        .token-box .copy-btn {
-            display: inline-block;
-            margin-top: 0.5rem;
-            padding: 0.35rem 0.85rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: #14273e;
-            background: #eef0f5;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .token-box .copy-btn:hover { background: #e2e8f0; }
-
-        /* ── Footer ── */
-        .footer {
-            text-align: center;
-            padding: 1.25rem;
-            font-size: 0.78rem;
-            color: #64748b;
-            border-top: 1px solid #e2e8f0;
-            background: #f8fafc;
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 600px) {
-            .header { padding: 1rem; gap: 0.75rem; }
-            .header .title-block .agency { font-size: 1rem; }
-            .card { padding: 1.5rem 1.25rem; }
-        }
-    </style>
-</head>
-<body>
-
-<!-- ─── Header ─── -->
-<header class="header">
-    <div class="crest">
-        <svg width="44" height="44" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M50 5 L95 25 L95 55 C95 78 75 93 50 98 C25 93 5 78 5 55 L5 25 Z"
-                  fill="#c8a84e" stroke="#c8a84e" stroke-width="2"/>
-            <circle cx="50" cy="48" r="14" fill="none" stroke="#14273e" stroke-width="3"/>
-            <path d="M50 34 L50 62 M34 48 L66 48" stroke="#14273e" stroke-width="3"/>
-            <path d="M50 20 L50 8 L56 12 L50 20" fill="#c8a84e"/>
-            <path d="M50 80 L50 92 L44 88 L50 80" fill="#c8a84e"/>
-            <rect x="38" y="5" width="4" height="10" rx="2" fill="#c8a84e"/>
-            <rect x="58" y="5" width="4" height="10" rx="2" fill="#c8a84e"/>
-            <rect x="38" y="85" width="4" height="10" rx="2" fill="#c8a84e"/>
-            <rect x="58" y="85" width="4" height="10" rx="2" fill="#c8a84e"/>
-            <text x="50" y="82" text-anchor="middle" font-size="10" font-weight="700" fill="#c8a84e">&#9733;</text>
-        </svg>
-    </div>
-    <div class="title-block">
-        <div class="ministry">Ministry of Finance</div>
-        <div class="agency">Tax Authority &mdash; Device Onboarding</div>
-    </div>
-</header>
-
-<!-- ─── Main ─── -->
-<main class="main">
-    <div class="card">
-        <h2>Register Your Device</h2>
-        <p class="subtitle">Complete the form to receive an enrollment token.</p>
-
-        <form id="tokenForm" novalidate>
-            <div class="form-group">
-                <label for="name">Full Name <span class="required">*</span></label>
-                <input type="text" id="name" name="name" placeholder="e.g. Ahmed Al-Fulani" required autocomplete="name">
-            </div>
-
-            <div class="form-group">
-                <label for="email">Email Address <span class="required">*</span></label>
-                <input type="email" id="email" name="email" placeholder="e.g. a.fulani@company.sa" required autocomplete="email">
-            </div>
-
-            <div class="form-group">
-                <label for="companyID">Company ID / TIN <span class="required">*</span></label>
-                <input type="text" id="companyID" name="companyID" placeholder="e.g. 399999999900003" required>
-            </div>
-
-            <div class="form-group">
-                <label for="otp">OTP <span class="required">*</span></label>
-                <input type="text" id="otp" name="otp" placeholder="Enter the one-time password provided by your company" inputmode="numeric" autocomplete="off" required>
-                <div class="hint">Provided by your company. If you do not have one, contact your organisation administrator.</div>
-            </div>
-
-            <button type="submit" class="btn-submit" id="submitBtn">Submit Request</button>
-        </form>
-
-        <div class="loading" id="loadingIndicator">Processing your request</div>
-        <div id="result"></div>
-    </div>
-</main>
-
-<!-- ─── Footer ─── -->
-<footer class="footer">
-    Tax Authority &bull; Official Portal &bull; All rights reserved.
-</footer>
-
-<script>
-    document.getElementById('tokenForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const loading = document.getElementById('loadingIndicator');
-        const result  = document.getElementById('result');
-        const btn     = document.getElementById('submitBtn');
-
-        loading.style.display = 'block';
-        result.innerHTML = '';
-        btn.disabled = true;
-
-        const formData = {
-            name:       document.getElementById('name').value.trim(),
-            email:      document.getElementById('email').value.trim(),
-            company_id: document.getElementById('companyID').value.trim(),
-        };
-
-        try {
-            const response = await fetch('/onboard', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                result.innerHTML = `
-                    <div class="alert alert-success">
-                        <strong>${data.message}</strong>
-                    </div>
-                    <div class="token-box">
-                        <strong>Enrollment Token:</strong><br>
-                        <span style="font-size:0.82rem">${data.token}</span><br>
-                        <button class="copy-btn" onclick="copyToken('${data.token}')">Copy Token</button>
-                    </div>
-                `;
-            } else {
-                result.innerHTML = `<div class="alert alert-error">${data.message || 'Request failed.'}</div>`;
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>STC Taxpayer Portal</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
             }
-        } catch (error) {
-            result.innerHTML = `<div class="alert alert-error">Network error. Please try again.</div>`;
-        } finally {
-            loading.style.display = 'none';
-            btn.disabled = false;
-        }
-    });
+            body {
+                font-family: Arial, sans-serif;
+                background: #f4f6f9;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                color: #0d1b2a;
+            }
+            .card {
+                width: 100%;
+                max-width: 460px;
+                background: white;
+                border: 1px solid #dde3ea;
+                border-radius: 12px;
+                padding: 28px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+            }
+            .logo {
+                text-align: center;
+                font-size: 36px;
+                margin-bottom: 10px;
+            }
+            h1 {
+                text-align: center;
+                font-size: 22px;
+                margin-bottom: 6px;
+                color: #1a3a5c;
+            }
+            .subtitle {
+                text-align: center;
+                color: #607086;
+                font-size: 14px;
+                line-height: 1.5;
+                margin-bottom: 24px;
+            }
+            label {
+                display: block;
+                font-size: 13px;
+                font-weight: bold;
+                margin-bottom: 6px;
+                color: #4a5568;
+            }
+            input {
+                width: 100%;
+                padding: 12px;
+                border: 1px solid #dde3ea;
+                border-radius: 8px;
+                font-size: 15px;
+                margin-bottom: 16px;
+            }
+            input:focus {
+                outline: none;
+                border-color: #1a3a5c;
+            }
+            button {
+                width: 100%;
+                padding: 12px;
+                border: none;
+                border-radius: 8px;
+                background: #1a3a5c;
+                color: white;
+                font-size: 15px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            button:hover {
+                opacity: 0.9;
+            }
+            button:disabled {
+                opacity: 0.5;
+                cursor: default;
+            }
+            .hidden {
+                display: none;
+            }
+            .info {
+                background: #e8f0f8;
+                border: 1px solid #bed0e8;
+                color: #1a3a5c;
+                padding: 12px;
+                border-radius: 8px;
+                font-size: 14px;
+                line-height: 1.5;
+                margin-bottom: 18px;
+            }
+            .row {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 10px 0;
+                border-bottom: 1px solid #edf1f5;
+                font-size: 14px;
+            }
+            .row:last-child {
+                border-bottom: none;
+            }
+            .row span {
+                color: #607086;
+            }
+            .row strong {
+                text-align: right;
+            }
+            .actions {
+                display: grid;
+                gap: 10px;
+                margin-top: 20px;
+            }
+            .secondary {
+                background: white;
+                color: #1a3a5c;
+                border: 1px solid #bed0e8;
+            }
+            .result {
+                margin-top: 16px;
+                padding: 12px;
+                border-radius: 8px;
+                font-size: 14px;
+                line-height: 1.5;
+            }
+            .success {
+                background: #edf7f1;
+                color: #276749;
+                border: 1px solid #cde8d5;
+            }
+            .error {
+                background: #fdf0f2;
+                color: #9b2335;
+                border: 1px solid #f0c9d0;
+            }
+            .token {
+                margin-top: 10px;
+                padding: 10px;
+                border: 1px solid #dde3ea;
+                border-radius: 8px;
+                background: #f4f6f9;
+                font-family: monospace;
+                word-break: break-all;
+                font-size: 13px;
+            }
+            .footer {
+                text-align: center;
+                color: #8a9bb0;
+                font-size: 12px;
+                margin-top: 18px;
+                line-height: 1.5;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="logo">🏛</div>
+            <h1>Sudan Taxation Chamber</h1>
+            <p class="subtitle" id="subtitle">
+                Sign in using your assigned taxpayer TIN and password.
+            </p>
 
-    function copyToken(token) {
-        navigator.clipboard.writeText(token).then(() => {
-            const btn = document.querySelector('.copy-btn');
-            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Token', 2000); }
-        }).catch(() => {
-            alert('Unable to copy. Please select and copy the token manually.');
-        });
-    }
-</script>
-</body>
+            <!-- Sign In -->
+            <div id="loginPage">
+                <label for="tin">TIN Number</label>
+                <input id="tin" placeholder="Example: 100200300" />
+
+                <label for="password">Password</label>
+                <input
+                    id="password"
+                    type="password"
+                    placeholder="Enter password"
+                />
+
+                <button onclick="signIn()">Sign In</button>
+                <div id="loginResult"></div>
+            </div>
+
+            <!-- Home -->
+            <div id="homePage" class="hidden">
+                <div class="info">
+                    Welcome. This is a simple taxpayer home page for managing
+                    STC-related services.
+                </div>
+
+                <div class="row">
+                    <span>TIN</span><strong id="homeTin"></strong>
+                </div>
+                <div class="row">
+                    <span>Taxpayer Status</span><strong>Active</strong>
+                </div>
+                <div class="row">
+                    <span>Main Service</span><strong>Device Enrollment</strong>
+                </div>
+
+                <div class="actions">
+                    <button onclick="generateToken()" id="tokenBtn">
+                        Generate New Device Token
+                    </button>
+                    <button
+                        class="secondary"
+                        onclick="
+                            showInfo('Invoice history can be added here later.')
+                        "
+                    >
+                        Invoice History
+                    </button>
+                    <button
+                        class="secondary"
+                        onclick="
+                            showInfo(
+                                'Business profile management can be added here later.',
+                            )
+                        "
+                    >
+                        Business Profile
+                    </button>
+                    <button class="secondary" onclick="logout()">
+                        Sign Out
+                    </button>
+                </div>
+
+                <div id="homeResult"></div>
+            </div>
+
+            <div class="footer">
+                Prototype taxpayer portal. Login is mocked locally. Device token
+                request still uses the existing /onboard endpoint.
+            </div>
+        </div>
+
+        <script>
+            let currentTin = "";
+
+            function signIn() {
+                const tin = document.getElementById("tin").value.trim();
+                const password = document
+                    .getElementById("password")
+                    .value.trim();
+
+                if (!tin) {
+                    showLogin("error", "TIN number is required.");
+                    return;
+                }
+                if (!password) {
+                    showLogin("error", "Password is required.");
+                    return;
+                }
+
+                // Mock sign in: any TIN and password are accepted.
+                currentTin = tin;
+                document.getElementById("homeTin").textContent = tin;
+                document.getElementById("loginPage").classList.add("hidden");
+                document.getElementById("homePage").classList.remove("hidden");
+                document.getElementById("subtitle").textContent =
+                    "Taxpayer home page";
+            }
+
+            function logout() {
+                currentTin = "";
+                document.getElementById("password").value = "";
+                document.getElementById("homeResult").innerHTML = "";
+                document.getElementById("homePage").classList.add("hidden");
+                document.getElementById("loginPage").classList.remove("hidden");
+                document.getElementById("subtitle").textContent =
+                    "Sign in using your assigned taxpayer TIN and password.";
+            }
+
+            function showLogin(type, msg) {
+                document.getElementById("loginResult").innerHTML =
+                    `<div class="result ${type}">${msg}</div>`;
+            }
+
+            function showHome(type, msg) {
+                document.getElementById("homeResult").innerHTML =
+                    `<div class="result ${type}">${msg}</div>`;
+            }
+
+            function showInfo(msg) {
+                showHome("success", msg);
+            }
+
+            async function generateToken() {
+                const btn = document.getElementById("tokenBtn");
+                btn.disabled = true;
+                btn.textContent = "Generating...";
+                document.getElementById("homeResult").innerHTML = "";
+
+                // Existing server request preserved.
+                const formData = {
+                    name: "",
+                    email: "",
+                    company_id: currentTin,
+                };
+
+                try {
+                    const response = await fetch("/onboard", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(formData),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        document.getElementById("homeResult").innerHTML = `
+          <div class="result success">
+            ${data.message || "Device enrollment token generated."}
+            <div class="token">${data.token || ""}</div>
+          </div>`;
+                    } else {
+                        showHome(
+                            "error",
+                            data.error || "Failed to generate token.",
+                        );
+                    }
+                } catch (e) {
+                    showHome("error", "Network error: " + e.message);
+                }
+
+                btn.disabled = false;
+                btn.textContent = "Generate New Device Token";
+            }
+        </script>
+    </body>
 </html>

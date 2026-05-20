@@ -40,10 +40,12 @@ pub async fn validate_invoice(
     }
 
     // 2. Check the Serial Number of the certificate
-    check_cert_serial(
-        &crypto.certificate,
+    if !check_cert_serial(
+        &intermediate.certificate,
         extract_crt_serial(&intermediate.invoice_bytes)?,
-    )?;
+    )? {
+        bail!("Certificate serial mismatch");
+    }
 
     // 3. Validate Schema
     let xml_body = std::str::from_utf8(&intermediate.invoice_bytes)
@@ -90,13 +92,13 @@ pub async fn validate_invoice(
     }
 
     // 8. Verify signature
-    if let Err(e) = verify_signature_with_cert(
+    if !verify_signature_with_cert(
         &intermediate.invoice_hash,
         &intermediate.invoice_signature,
         &intermediate.certificate,
-    ) {
-        error!(uuid = %uuid, "Signature verification failed: {}", e);
-        return Err(e);
+    )? {
+        error!(uuid = %uuid, "Signature verification failed");
+        bail!("Invalid invoice signature");
     }
 
     // 9. verify supplier tin with cert

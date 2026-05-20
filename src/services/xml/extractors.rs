@@ -264,6 +264,65 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(writer.into_inner().into_inner())
 }
 
+/// Extracts the SignedInfo element from XML signature.
+pub fn extract_signed_info(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut reader = Reader::from_reader(Cursor::new(xml));
+    reader.config_mut().trim_text(false);
+
+    let mut buf = Vec::new();
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+
+    let mut capturing = false;
+    let mut depth: usize = 0;
+
+    loop {
+        match reader.read_event_into(&mut buf)? {
+            Event::Start(e) => {
+                if e.local_name().as_ref() == b"SignedInfo" {
+                    capturing = true;
+                    depth = 1;
+                    let mut elem = e.to_owned();
+                    elem.push_attribute(("xmlns:ds", "http://www.w3.org/2000/09/xmldsig#"));
+                    writer.write_event(Event::Start(elem))?;
+                } else if capturing {
+                    depth += 1;
+                    writer.write_event(Event::Start(e.to_owned()))?;
+                }
+            }
+
+            Event::Empty(e) => {
+                if capturing {
+                    writer.write_event(Event::Empty(e.to_owned()))?;
+                }
+            }
+
+            Event::Text(e) => {
+                if capturing {
+                    writer.write_event(Event::Text(e.to_owned()))?;
+                }
+            }
+
+            Event::End(e) => {
+                if capturing {
+                    writer.write_event(Event::End(e.to_owned()))?;
+                    depth -= 1;
+
+                    if depth == 0 {
+                        break;
+                    }
+                }
+            }
+
+            Event::Eof => break,
+            _ => {}
+        }
+
+        buf.clear();
+    }
+
+    Ok(writer.into_inner().into_inner())
+}
+
 /// Extracts the ICV (Invoice Counter Value) from invoice XML.
 pub fn extract_icv(invoice: &[u8]) -> anyhow::Result<i32> {
     let mut reader = Reader::from_reader(Cursor::new(invoice));

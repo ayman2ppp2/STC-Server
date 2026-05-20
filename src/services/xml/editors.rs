@@ -1,4 +1,6 @@
 use anyhow::anyhow;
+use base64::Engine;
+use base64::engine::general_purpose;
 use chrono::Utc;
 use quick_xml::events::{BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -154,12 +156,12 @@ pub fn edit_signed_info(
                 if in_digest_value {
                     match active_ref {
                         ActiveReference::Invoice => {
-                            let str_invoice_hash = String::from_utf8(invoice_hash.to_vec())?;
+                            let str_invoice_hash = general_purpose::STANDARD.encode(invoice_hash);
                             writer.write_event(Event::Text(BytesText::new(&str_invoice_hash)))?;
                         }
                         ActiveReference::SignedProperties => {
                             let str_signed_props_hash =
-                                String::from_utf8(signed_props_hash.to_vec())?;
+                                general_purpose::STANDARD.encode(signed_props_hash);
                             writer
                                 .write_event(Event::Text(BytesText::new(&str_signed_props_hash)))?;
                         }
@@ -535,7 +537,7 @@ mod tests {
         )
         .unwrap();
         assert!(!result.contains("oldInvoiceHash"));
-        assert!(result.contains("newInvoiceHash"));
+        assert!(result.contains("bmV3SW52b2ljZUhhc2g="));
     }
 
     #[test]
@@ -546,7 +548,7 @@ mod tests {
         )
         .unwrap();
         assert!(!result.contains("oldPropHash"));
-        assert!(result.contains("newPropHash"));
+        assert!(result.contains("bmV3UHJvcEhhc2g="));
     }
 
     #[test]
@@ -591,7 +593,7 @@ fn test_edit_signed_info_invoice_hash_replacement() {
     )
     .unwrap();
     assert!(!result.contains("oldInvoiceHash"));
-    assert!(result.contains("newInvoiceHash"));
+    assert!(result.contains("bmV3SW52b2ljZUhhc2g="));
 }
 
 #[test]
@@ -601,7 +603,7 @@ fn test_edit_signed_info_signed_properties_hash_replacement() {
         String::from_utf8(edit_signed_info(xml.as_bytes(), b"invHash", b"newPropHash").unwrap())
             .unwrap();
     assert!(!result.contains("oldPropHash"));
-    assert!(result.contains("newPropHash"));
+    assert!(result.contains("bmV3UHJvcEhhc2g="));
 }
 
 #[test]
