@@ -35,17 +35,17 @@ pub fn clear_invoice(
     let signed_properties_hash = compute_hash(&canonicalize_c14n11(signed_properties)?)?;
     // edit the signed info to add the new invoice hash and SP hash
     let edited_signed_info_invoice_bytes = edit_signed_info(
-        &intermediate_dto.invoice_bytes, 
+        &edited_signed_properties_invoice_bytes, 
         &invoice_hash,
         &signed_properties_hash,
     )?;
     // compute hash for the edited signed info
-    let signed_info_hash = compute_hash(&canonicalize_c14n11(extract_signed_info(
+    let signed_info_canonical = &canonicalize_c14n11(extract_signed_info(
         &edited_signed_info_invoice_bytes,
-    )?)?)?;
+    )?)?;
     // let edited_qr_invoice_bytes = edit_qr(invoice_hash,signature);
     // sign the signed info hash
-    let signature = sign(signed_info_hash, crypto)?;
+    let signature = sign(signed_info_canonical, crypto)?;
     // base64 encoding 
     let signature_b64 = general_purpose::STANDARD.encode(&signature);
     // injecting the signature

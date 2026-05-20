@@ -136,9 +136,9 @@ pub async fn sign_csr(req: &X509Req, crypto: &Crypto) -> Result<X509, openssl::e
     Ok(builder.build())
 }
 
-pub fn sign(hash: Vec<u8>, crypto: &Crypto) -> anyhow::Result<Vec<u8>> {
+pub fn sign(hash: &[u8], crypto: &Crypto) -> anyhow::Result<Vec<u8>> {
     let mut signer = Signer::new(MessageDigest::sha256(), &crypto.private_key)?;
-    signer.update(&hash)?;
+    signer.update(hash)?;
     let signature = signer.sign_to_vec()?;
     Ok(signature)
 }

@@ -38,7 +38,12 @@ pub async fn clearance(
     crypto: web::Data<Crypto>,
     schema_validator: web::Data<CompiledSchema>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let sandbox = req.headers().contains_key("X-Sandbox-Mode");
+    let sandbox = req
+        .headers()
+        .get("X-Sandbox-Mode")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
     let dto = invoice_dto.into_inner();
     let raw_uuid = dto.uuid.clone();
 

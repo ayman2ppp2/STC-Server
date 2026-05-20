@@ -8,16 +8,10 @@ use crate::{
     config::crypto_config::Crypto,
     models::submit_invoice::{IntermediateInvoiceDto, InvoiceType},
     services::{
-        db::check_uuid::check_uuid,
-        xml::extractors::{extract_crt_serial, extract_customer_tin},
-        pipeline::invoice_type_service::verify_invoice_type,
-        db::pih_service::verify_pih,
         crypto::pki_service::{
             check_cert_serial, compute_hash, verfiy_supplier_tin_with_ca, verify_cert_with_ca,
             verify_signature_with_cert,
-        },
-        xml::schema_validation::validate_schema,
-        db::tin_service::{verify_customer_tin, verify_supplier_tin},
+        }, db::{check_uuid::check_uuid, pih_service::verify_pih, tin_service::{verify_customer_tin, verify_supplier_tin}}, pipeline::invoice_type_service::verify_invoice_type, xml::{extractors::{extract_crt_serial, extract_customer_tin, extract_signed_info}, schema_validation::validate_schema}
     },
 };
 
@@ -93,7 +87,7 @@ pub async fn validate_invoice(
 
     // 8. Verify signature
     if !verify_signature_with_cert(
-        &intermediate.invoice_hash,
+        &extract_signed_info(&intermediate.invoice_bytes)?,
         &intermediate.invoice_signature,
         &intermediate.certificate,
     )? {
