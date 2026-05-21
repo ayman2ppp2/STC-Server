@@ -19,11 +19,13 @@ pub async fn verify_qr(
         })),
         Err(e) => {
             tracing::error!(error = %e, "QR verification failed");
-            Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "QR verification failed".into(),
-                data: None,
-            }))
-        },
+            Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "QR verification failed".into(),
+                    data: None,
+                }),
+            )
+        }
     }
 }

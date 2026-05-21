@@ -1,10 +1,11 @@
-use base64::{engine::general_purpose, Engine};
+use anyhow::{Context, bail};
+use base64::{Engine, engine::general_purpose};
 
 /// Edits TLV-encoded QR code data by replacing hash and signature values.
 /// Returns the modified data as a base64-encoded string.
 pub fn edit_tlv(qr_b64: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<String> {
     let bytes = general_purpose::STANDARD.decode(qr_b64)?;
-    let mut records = extract_records(&bytes);
+    let mut records = extract_records(&bytes)?;
     for (tag, value) in records.iter_mut() {
         match tag {
             6 => *value = hash.to_vec(),
@@ -16,7 +17,7 @@ pub fn edit_tlv(qr_b64: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<
 }
 
 /// Extracts TLV records from raw bytes. Returns a vector of (tag, value) tuples.
-pub fn extract_records(tlv_bytes: &[u8]) -> Vec<(u8, Vec<u8>)> {
+pub fn extract_records(tlv_bytes: &[u8]) -> anyhow::Result<Vec<(u8, Vec<u8>)>> {
     let mut pos = 0;
     let mut records = Vec::new();
 
@@ -24,55 +25,43 @@ pub fn extract_records(tlv_bytes: &[u8]) -> Vec<(u8, Vec<u8>)> {
         let tag = tlv_bytes[pos];
         pos += 1;
 
-        // Read length
-        let len = tlv_bytes[pos] as usize;
+        let len = *tlv_bytes
+            .get(pos)
+            .context("truncated TLV record: missing length")? as usize;
         pos += 1;
 
-        // Handle long form lengths
-        if len > 0x80 {
-            if len == 0x81 {
-                // Length is in next byte
-                if pos >= tlv_bytes.len() {
-                    break;
-                }
-                let actual_len = tlv_bytes[pos] as usize;
-                pos += 1;
-
-                if pos + actual_len > tlv_bytes.len() {
-                    break;
-                }
-                let value = tlv_bytes[pos..pos + actual_len].to_vec();
-                pos += actual_len;
-                records.push((tag, value));
-            } else if len == 0x82 {
-                // Length is in next 2 bytes
-                if pos + 1 >= tlv_bytes.len() {
-                    break;
-                }
-                let actual_len = ((tlv_bytes[pos] as usize) << 8) | (tlv_bytes[pos + 1] as usize);
-                pos += 2;
-
-                if pos + actual_len > tlv_bytes.len() {
-                    break;
-                }
-                let value = tlv_bytes[pos..pos + actual_len].to_vec();
-                pos += actual_len;
-                records.push((tag, value));
-            } else {
-                // Invalid or unsupported long form
-                break;
-            }
+        let actual_len = if len <= 0x7f {
+            len
+        } else if len == 0x81 {
+            let actual_len = *tlv_bytes
+                .get(pos)
+                .context("truncated TLV record: missing long-form length")?
+                as usize;
+            pos += 1;
+            actual_len
+        } else if len == 0x82 {
+            let high = *tlv_bytes
+                .get(pos)
+                .context("truncated TLV record: missing long-form length high byte")?
+                as usize;
+            let low = *tlv_bytes
+                .get(pos + 1)
+                .context("truncated TLV record: missing long-form length low byte")?
+                as usize;
+            pos += 2;
+            (high << 8) | low
         } else {
-            // Short form length
-            if pos + len > tlv_bytes.len() {
-                break;
-            }
-            let value = tlv_bytes[pos..pos + len].to_vec();
-            pos += len;
-            records.push((tag, value));
+            bail!("unsupported TLV length form");
+        };
+
+        let end = pos.checked_add(actual_len).context("TLV length overflow")?;
+        if end > tlv_bytes.len() {
+            bail!("truncated TLV record: value shorter than declared length");
         }
+        records.push((tag, tlv_bytes[pos..end].to_vec()));
+        pos = end;
     }
-    records
+    Ok(records)
 }
 fn new_tlv(records: Vec<(u8, Vec<u8>)>) -> anyhow::Result<String> {
     let mut new_tlv = Vec::new();
@@ -110,5 +99,25 @@ mod tests {
         // let serialized = format!("{:?}", result);
         // file.write_all(serialized.as_bytes()).unwrap();
         // .expect("shit happens");
+    }
+
+    #[test]
+    fn test_extract_records_rejects_missing_length() {
+        let err = extract_records(&[6]).unwrap_err().to_string();
+        assert!(err.contains("missing length"));
+    }
+
+    #[test]
+    fn test_extract_records_rejects_truncated_value() {
+        let err = extract_records(&[6, 4, 1, 2]).unwrap_err().to_string();
+        assert!(err.contains("value shorter"));
+    }
+
+    #[test]
+    fn test_extract_records_rejects_unsupported_length_form() {
+        let err = extract_records(&[6, 0x83, 0, 0, 1, 0])
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unsupported TLV length form"));
     }
 }

@@ -1,7 +1,7 @@
 use actix_web::{App, HttpServer, web};
 use stc_server::{
-    config::{db_config, xsd_config::schema_validator_from_temp},
     config::crypto_config::Crypto,
+    config::{db_config, xsd_config::schema_validator_from_temp},
     routes::{
         enroll::enroll,
         health_check::{health_check, hello},
@@ -13,12 +13,11 @@ use stc_server::{
     services::db::token_checking::token_cleanup_loop,
 };
 use tracing_actix_web::TracingLogger;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("warn"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
     let fmt_layer = fmt::layer()
         .json()
         .with_target(true)
@@ -79,7 +78,7 @@ async fn main() -> std::io::Result<()> {
             .route("/enroll", web::post().to(enroll))
             .route("/onboard", web::get().to(on_board))
             .route("/onboard", web::post().to(token_generator))
-            .route("/get_invoices", web::get().to(get_invoices)) 
+            .route("/get_invoices", web::get().to(get_invoices))
             // https://stc-server.onrender.com/clear
             // https://stc-server.onrender.com/report
             .route("/verify_qr", web::post().to(verify_qr))

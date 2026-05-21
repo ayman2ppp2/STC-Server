@@ -16,7 +16,8 @@ pub async fn token_generator(
 
     match result {
         Ok(onboarding) => {
-            let message = "Token generated successfully. Use this token within 5 minutes.".to_string();
+            let message =
+                "Token generated successfully. Use this token within 5 minutes.".to_string();
             Ok(HttpResponse::Ok().json(OnBoardResponseDto {
                 message,
                 token: onboarding.token,
@@ -25,17 +26,21 @@ pub async fn token_generator(
         Err(e) => {
             tracing::error!(company_id = %company_id, error = %e, "Token generation failed");
             if e.to_string().contains("not found in taxpayer registry") {
-                Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Invalid company ID".to_string(),
-                    data: None,
-                }))
+                Ok(
+                    HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                        success: false,
+                        message: "Invalid company ID".to_string(),
+                        data: None,
+                    }),
+                )
             } else {
-                Ok(HttpResponse::InternalServerError().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Internal server error".to_string(),
-                    data: None,
-                }))
+                Ok(
+                    HttpResponse::InternalServerError().json(ApiResponse::<serde_json::Value> {
+                        success: false,
+                        message: "Internal server error".to_string(),
+                        data: None,
+                    }),
+                )
             }
         }
     }

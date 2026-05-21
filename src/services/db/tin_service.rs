@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use tracing::instrument;
 
 #[instrument(skip(pool), fields(tin = %String::from_utf8_lossy(supplier_tin)))]
-pub async fn verify_supplier_tin(supplier_tin: &[u8],pool: &PgPool) -> anyhow::Result<()> {
-    match check_supplier_tin(supplier_tin,pool).await {
+pub async fn verify_supplier_tin(supplier_tin: &[u8], pool: &PgPool) -> anyhow::Result<()> {
+    match check_supplier_tin(supplier_tin, pool).await {
         Ok(b) => match b {
             true => {}
             false => bail!("invalid supplier TIN"),
@@ -15,8 +15,8 @@ pub async fn verify_supplier_tin(supplier_tin: &[u8],pool: &PgPool) -> anyhow::R
     Ok(())
 }
 #[instrument(skip(pool), fields(tin = %String::from_utf8_lossy(customer_tin)))]
-pub async fn verify_customer_tin(customer_tin:&[u8],pool: &PgPool) -> anyhow::Result<()> {
-    match check_customer_tin(customer_tin,pool).await {
+pub async fn verify_customer_tin(customer_tin: &[u8], pool: &PgPool) -> anyhow::Result<()> {
+    match check_customer_tin(customer_tin, pool).await {
         Ok(b) => match b {
             true => {}
             false => bail!("invalid customer TIN"),
@@ -42,8 +42,8 @@ async fn check_supplier_tin(extracted_tin: &[u8], pool: &PgPool) -> anyhow::Resu
     .await?;
     Ok(exists)
 }
-async fn check_customer_tin(extracted_tin: &[u8],pool: &PgPool) -> anyhow::Result<bool> {
-   let exists = sqlx::query_scalar!(
+async fn check_customer_tin(extracted_tin: &[u8], pool: &PgPool) -> anyhow::Result<bool> {
+    let exists = sqlx::query_scalar!(
         r#"
     SELECT EXISTS(
         SELECT 1 

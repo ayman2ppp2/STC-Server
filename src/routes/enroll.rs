@@ -35,7 +35,8 @@ pub async fn enroll(
         })),
         Err(e) => {
             tracing::error!(error = %e, "Enrollment failed");
-            let status = if e.to_string().contains("not found or expired") || e.to_string().contains("hash mismatch")
+            let status = if e.to_string().contains("not found or expired")
+                || e.to_string().contains("hash mismatch")
             {
                 "Invalid or expired token"
             } else if e.to_string().contains("Supplier TIN not found in database") {
@@ -43,11 +44,13 @@ pub async fn enroll(
             } else {
                 "Enrollment failed"
             };
-            Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: status.to_string(),
-                data: None,
-            }))
+            Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: status.to_string(),
+                    data: None,
+                }),
+            )
         }
     }
 }

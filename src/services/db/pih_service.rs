@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::services::{xml::extractors::extract_pih, crypto::pki_service::compute_hash};
+use crate::services::{crypto::pki_service::compute_hash, xml::extractors::extract_pih};
 
 #[instrument(skip(pool), fields(device_uuid = %device_id))]
 pub async fn verify_pih(

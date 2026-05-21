@@ -25,7 +25,11 @@ pub fn verify_invoice_type(
         ),
     };
     if !(&ex_invoice_type == invoice_type) {
-        bail!("Invoice type verfication error invoice type mismatch , Provided : {} != Extracted :{}",invoice_type.as_str(),ex_invoice_type.as_str())
+        bail!(
+            "Invoice type verfication error invoice type mismatch , Provided : {} != Extracted :{}",
+            invoice_type.as_str(),
+            ex_invoice_type.as_str()
+        )
     }
     Ok(true)
 }

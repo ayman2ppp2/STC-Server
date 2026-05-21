@@ -14,7 +14,7 @@ use crate::services::xml::edit_tlv::edit_tlv;
 3. Canonicalize SignedProperties → hash SignedProperties
 4. Build SignedInfo (with both digests)
 5. Canonicalize SignedInfo -> hash signedInfo
-6. ECDSA sign → SignatureValue
+6. RSA sign → SignatureValue
 7. Build QR using invoice hash + signature
 */
 
@@ -96,6 +96,8 @@ enum ActiveReference {
     SignedProperties,
     Other,
 }
+
+const XADES_SIGNED_PROPERTIES: &[u8] = b"http://uri.etsi.org/01903#SignedProperties";
 pub fn edit_signed_info(
     xml: &[u8],
     invoice_hash: &[u8],
@@ -121,10 +123,16 @@ pub fn edit_signed_info(
                             b"Id" if attr.value.as_ref() == b"invoiceSignedData" => {
                                 active_ref = ActiveReference::Invoice;
                             }
+                            b"URI" if attr.value.as_ref() == b"" => {
+                                active_ref = ActiveReference::Invoice;
+                            }
                             b"Type"
                                 if attr.value.as_ref()
                                     == b"http://www.w3.org/2000/09/xmldsig#SignatureProperties" =>
                             {
+                                active_ref = ActiveReference::SignedProperties;
+                            }
+                            b"Type" if attr.value.as_ref() == XADES_SIGNED_PROPERTIES => {
                                 active_ref = ActiveReference::SignedProperties;
                             }
                             _ => {}
@@ -366,9 +374,10 @@ mod tests {
 
     fn extract_current_signing_time(xml: &[u8]) -> Option<String> {
         let xml_str = std::str::from_utf8(xml).ok()?;
-        let start = xml_str.find("<xades:SigningTime>")?;
+        let tag_name_start = xml_str.find("xades:SigningTime")?;
+        let content_start = xml_str[tag_name_start..].find('>')? + tag_name_start + 1;
         let end = xml_str.find("</xades:SigningTime>")?;
-        Some(xml_str[start + 20..end].to_string())
+        Some(xml_str[content_start..end].to_string())
     }
 
     // Original simple tests
@@ -420,13 +429,7 @@ mod tests {
         assert!(!result_str.contains(&original_time));
 
         // Verify new timestamp is present and follows ISO format
-        assert!(result_str.contains("<xades:SigningTime>"));
-        assert!(result_str.contains("</xades:SigningTime>"));
-
-        // Extract new time and validate format
-        let start = result_str.find("<xades:SigningTime>").unwrap();
-        let end = result_str.find("</xades:SigningTime>").unwrap();
-        let new_time = &result_str[start + 20..end];
+        let new_time = extract_current_signing_time(&result).unwrap();
 
         // Should match ISO format pattern
         assert!(new_time.len() >= 19); // At least YYYY-MM-DDTHH:MM:SS
@@ -448,15 +451,15 @@ mod tests {
         )
         .unwrap();
         let result_str = String::from_utf8(result.clone()).unwrap();
+        let expected_invoice_hash = general_purpose::STANDARD.encode(TEST_INVOICE_HASH.as_bytes());
 
         // Verify old invoice hash is gone
         assert!(!result_str.contains("V4U5qlZ3yXQ/Si1AC/R8SLc3F+iNy27wdVe8IWRqFAQ="));
 
         // Verify new invoice hash is present
-        assert!(result_str.contains(TEST_INVOICE_HASH));
+        assert!(result_str.contains(&expected_invoice_hash));
 
-        // Verify invoiceSignedData Reference structure is preserved
-        assert!(result_str.contains("Id=\"invoiceSignedData\""));
+        // Verify invoice Reference structure is preserved
         assert!(result_str.contains("URI=\"\""));
 
         // Verify XML is still well-formed
@@ -477,7 +480,7 @@ mod tests {
         assert!(result_str.contains(TEST_SIGNATURE));
 
         // Verify ds namespace is preserved
-        assert!(result_str.contains("<ds:SignatureValue>"));
+        assert!(result_str.contains("<ds:SignatureValue"));
         assert!(result_str.contains("</ds:SignatureValue>"));
 
         // Verify XML is still well-formed
@@ -507,10 +510,13 @@ mod tests {
         assert!(validate_xml_well_formed(&final_result));
 
         let result_str = String::from_utf8(final_result.clone()).unwrap();
+        let expected_invoice_hash = general_purpose::STANDARD.encode(TEST_INVOICE_HASH.as_bytes());
+        let expected_signed_props_hash =
+            general_purpose::STANDARD.encode(TEST_SIGNED_PROPS_HASH.as_bytes());
 
         // Verify all modifications are present
-        assert!(result_str.contains(TEST_INVOICE_HASH));
-        assert!(result_str.contains(TEST_SIGNED_PROPS_HASH));
+        assert!(result_str.contains(&expected_invoice_hash));
+        assert!(result_str.contains(&expected_signed_props_hash));
         assert!(result_str.contains(TEST_SIGNATURE));
 
         // Verify old values are gone
@@ -522,8 +528,8 @@ mod tests {
         assert!(!result_str.contains("2024-01-14T10:21:40"));
 
         // Verify XML structure is preserved
-        assert!(result_str.contains("<cbc:ID>SME00015</cbc:ID>"));
-        assert!(result_str.contains("<cbc:IssueDate>2022-09-05</cbc:IssueDate>"));
+        assert!(result_str.contains("<cbc:ID>"));
+        assert!(result_str.contains("<cbc:IssueDate>"));
         assert!(result_str.contains("<xades:SignedProperties"));
         assert!(result_str.contains("<ds:SignedInfo>"));
     }

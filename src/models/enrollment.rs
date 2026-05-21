@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Context};
-use base64::{engine::general_purpose, Engine};
+use anyhow::{Context, anyhow};
+use base64::{Engine, engine::general_purpose};
 use openssl::{nid::Nid, x509::X509Req};
 
 #[derive(serde::Deserialize)]

@@ -5,9 +5,15 @@ use sqlx::PgPool;
 use tracing;
 
 use crate::{
-    config::{crypto_config::Crypto},
-    models::{responses::ApiResponse, submit_invoice::{InvoiceType, SubmitInvoiceDto}},
-    services::{pipeline::clearance_service::process_clearance, pipeline::reporting_service::process_reporting},
+    config::crypto_config::Crypto,
+    models::{
+        responses::ApiResponse,
+        submit_invoice::{InvoiceType, SubmitInvoiceDto},
+    },
+    services::{
+        pipeline::clearance_service::process_clearance,
+        pipeline::reporting_service::process_reporting,
+    },
 };
 
 pub async fn get_invoices(db: web::Data<PgPool>) -> impl actix_web::Responder {
@@ -51,39 +57,52 @@ pub async fn clearance(
         Ok(dto) => dto,
         Err(e) => {
             tracing::error!(uuid = %raw_uuid, error = %e, "Failed to parse clearance invoice");
-            return Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "Invalid invoice data".into(),
-                data: None,
-            }));
+            return Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Invalid invoice data".into(),
+                    data: None,
+                }),
+            );
         }
     };
     if !intermediate_dto.device.is_active {
-        return Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-            success: false,
-            message: "Device is not enabled".into(),
-            data: None,
-        }));
+        return Ok(
+            HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                success: false,
+                message: "Device is not enabled".into(),
+                data: None,
+            }),
+        );
     }
 
     let uuid = intermediate_dto.uuid;
     let device_uuid = intermediate_dto.device.device_uuid;
 
-    match process_clearance(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Clearance).await {
-        Ok(cleared_invoice) => {
-            Ok(HttpResponse::Ok().json(ApiResponse {
-                success: true,
-                message: "Invoice cleared".into(),
-                data: Some(json!({"cleared_invoice": cleared_invoice})),
-            }))
-        }
+    match process_clearance(
+        intermediate_dto,
+        &db_pool,
+        &crypto,
+        sandbox,
+        schema_validator,
+        InvoiceType::Clearance,
+    )
+    .await
+    {
+        Ok(cleared_invoice) => Ok(HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            message: "Invoice cleared".into(),
+            data: Some(json!({"cleared_invoice": cleared_invoice})),
+        })),
         Err(e) => {
             tracing::error!(uuid = %uuid, device_uuid = %device_uuid, error = %e, "Clearance pipeline failed");
-            Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "Clearance failed".into(),
-                data: Some(json!({"error": e.to_string()})),
-            }))
+            Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Clearance failed".into(),
+                    data: Some(json!({"error": e.to_string()})),
+                }),
+            )
         }
     }
 }
@@ -103,40 +122,53 @@ pub async fn reporting(
         Ok(dto) => dto,
         Err(e) => {
             tracing::error!(uuid = %raw_uuid, error = %e, "Failed to parse reporting invoice");
-            return Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "Invalid invoice data".into(),
-                data: None,
-            }));
+            return Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Invalid invoice data".into(),
+                    data: None,
+                }),
+            );
         }
     };
 
     if !intermediate_dto.device.is_active {
-        return Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-            success: false,
-            message: "Device is not enabled".into(),
-            data: None,
-        }));
+        return Ok(
+            HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                success: false,
+                message: "Device is not enabled".into(),
+                data: None,
+            }),
+        );
     }
 
     let uuid = intermediate_dto.uuid;
     let device_uuid = intermediate_dto.device.device_uuid;
 
-    match process_reporting(intermediate_dto, &db_pool, &crypto, sandbox, schema_validator, InvoiceType::Reporting).await {
-        Ok(_) => {
-            Ok(HttpResponse::Ok().json(ApiResponse::<()> {
-                success: true,
-                message: "Invoice reported".into(),
-                data: None,
-            }))
-        }
+    match process_reporting(
+        intermediate_dto,
+        &db_pool,
+        &crypto,
+        sandbox,
+        schema_validator,
+        InvoiceType::Reporting,
+    )
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::<()> {
+            success: true,
+            message: "Invoice reported".into(),
+            data: None,
+        })),
         Err(e) => {
             tracing::error!(uuid = %uuid, device_uuid = %device_uuid, error = %e, "Reporting pipeline failed");
-            Ok(HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "Reporting failed".into(),
-                data: None,
-            }))
+            Ok(
+                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
+                    success: false,
+                    message: "Reporting failed".into(),
+                    data: None,
+                }),
+            )
         }
     }
 }
