@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::services::{crypto::pki_service::compute_hash, xml::extractors::extract_pih};
 
-#[instrument(skip(pool), fields(device_uuid = %device_id))]
+#[instrument(skip(invoice, pool), fields(device_uuid = %device_id))]
 pub async fn verify_pih(
     invoice: &[u8],
     pool: &PgPool,

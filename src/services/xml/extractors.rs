@@ -1,6 +1,9 @@
 use anyhow::{Context, bail};
 use openssl::bn::BigNum;
-use quick_xml::{Reader, Writer, events::{BytesStart, Event}};
+use quick_xml::{
+    Reader, Writer,
+    events::{BytesStart, Event},
+};
 use std::io::Cursor;
 
 const DS_NS: &[u8] = b"http://www.w3.org/2000/09/xmldsig#";
@@ -219,7 +222,10 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
 }
 
 /// Extracts the SignedProperties element from XML signature.
-pub fn extract_signed_properties(xml: &[u8], expected_ns: Option<&[u8]>) -> anyhow::Result<Vec<u8>> {
+pub fn extract_signed_properties(
+    xml: &[u8],
+    expected_ns: Option<&[u8]>,
+) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(false);
 

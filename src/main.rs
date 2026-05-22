@@ -1,4 +1,4 @@
-use actix_web::{App, HttpServer, web};
+use actix_web::{App, HttpMessage, HttpServer, dev::Service, http::header, web};
 use stc_server::{
     config::crypto_config::Crypto,
     config::{db_config, xsd_config::schema_validator_from_temp},
@@ -12,12 +12,14 @@ use stc_server::{
     },
     services::db::token_checking::token_cleanup_loop,
 };
-use tracing_actix_web::TracingLogger;
+use tracing_actix_web::{RequestId, TracingLogger};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new("stc_server=info,tracing_actix_web=info,actix_web=warn")
+    });
     let fmt_layer = fmt::layer()
         .json()
         .with_target(true)
@@ -25,7 +27,7 @@ fn init_tracing() {
         .with_thread_names(true)
         .with_file(true)
         .with_line_number(true)
-        .with_span_events(FmtSpan::FULL);
+        .with_span_events(FmtSpan::CLOSE);
 
     tracing_subscriber::registry()
         .with(filter)
@@ -67,6 +69,24 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
+            .wrap_fn(|req, srv| {
+                let fut = srv.call(req);
+                async move {
+                    let mut res = fut.await?;
+                    let request_id = res
+                        .request()
+                        .extensions()
+                        .get::<RequestId>()
+                        .map(ToString::to_string);
+                    if let Some(request_id) = request_id
+                        && let Ok(value) = header::HeaderValue::from_str(&request_id)
+                    {
+                        res.headers_mut()
+                            .insert(header::HeaderName::from_static("x-request-id"), value);
+                    }
+                    Ok(res)
+                }
+            })
             .app_data(xsd_schema.clone())
             .app_data(pool_data.clone())
             .app_data(crypto_data.clone())

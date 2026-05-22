@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::models::submit_invoice::InvoiceType;
 
-#[instrument(skip(tx), fields(uuid = %uuid, device_uuid = %device_id))]
+#[instrument(skip(tx, invoiceb64, hash), fields(uuid = %uuid, device_uuid = %device_id, invoice_type = %invoice_type.as_str()))]
 pub async fn save_invoice<'a>(
     tx: &mut Transaction<'a, Postgres>,
     invoiceb64: &String,

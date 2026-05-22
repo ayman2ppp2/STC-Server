@@ -7,6 +7,7 @@ use base64::engine::general_purpose;
 use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::models::device::Device;
@@ -47,6 +48,7 @@ pub struct IntermediateInvoiceDto {
 }
 
 impl SubmitInvoiceDto {
+    #[instrument(skip(self, pool), fields(uuid = %self.uuid, invoice_b64_len = self.invoice.len()))]
     pub async fn parse(self, pool: &PgPool) -> anyhow::Result<IntermediateInvoiceDto> {
         let invoice_bytes = general_purpose::STANDARD
             .decode(self.invoice)

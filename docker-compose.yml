@@ -25,7 +25,7 @@ services:
       DATABASE_URL: postgres://postgres:password@postgres:5432/stc-server
       SEC_CERTIFICATE: ${SEC_CERTIFICATE}
       SEC_PRIVATE_KEY: ${SEC_PRIVATE_KEY}
-      RUST_LOG: warn
+      RUST_LOG: stc_server=info,tracing_actix_web=info,actix_web=warn
     ports:
       - "8080:8000"
     depends_on:

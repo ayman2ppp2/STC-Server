@@ -16,7 +16,16 @@ use crate::{
     },
 };
 
-#[instrument(skip_all)]
+#[instrument(
+    skip(db_pool, crypto, schema, intermediate),
+    fields(
+        uuid = %intermediate.uuid,
+        device_uuid = %intermediate.device.device_uuid,
+        supplier_tin = %intermediate.supplier,
+        sandbox,
+        invoice_type = ?invoice_type
+    )
+)]
 pub async fn process_clearance(
     intermediate: IntermediateInvoiceDto,
     db_pool: &PgPool,

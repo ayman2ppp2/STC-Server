@@ -11,8 +11,8 @@ use quick_xml::{
     Reader, Writer,
     events::{BytesStart, Event},
 };
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 use crate::services::{
     crypto::pki_service::{compute_hash, verify_signature_with_cert},
@@ -178,11 +178,7 @@ fn enforce_profile_structure(profile: &SignatureProfile) -> anyhow::Result<()> {
     if profile.signed_properties_id.is_none() {
         bail!("SignedProperties is missing Id");
     }
-    let signing_time = profile
-        .signing_time
-        .as_deref()
-        .unwrap_or_default()
-        .trim();
+    let signing_time = profile.signing_time.as_deref().unwrap_or_default().trim();
     if signing_time.is_empty() {
         bail!("SignedSignatureProperties is missing SigningTime");
     }
@@ -465,10 +461,12 @@ fn parse_signature_profile(signature_xml: &[u8]) -> anyhow::Result<SignatureProf
                     profile.references.push(reference);
                 }
                 b"xades:CertDigest" => in_cert_digest = false,
-                b"ds:SignatureValue" | b"ds:X509Certificate" | b"ds:DigestValue"
-                | b"ds:X509IssuerName" | b"ds:X509SerialNumber" | b"xades:SigningTime" => {
-                    text_field = None
-                }
+                b"ds:SignatureValue"
+                | b"ds:X509Certificate"
+                | b"ds:DigestValue"
+                | b"ds:X509IssuerName"
+                | b"ds:X509SerialNumber"
+                | b"xades:SigningTime" => text_field = None,
                 _ => {}
             },
             Ok(Event::Eof) => break,
@@ -906,7 +904,8 @@ mod tests {
         let xml = br#"<ds:Signature Id="sig"><ds:SignedInfo/></ds:Signature>"#;
         assert!(extract_single_signature(xml).is_ok());
 
-        let xml = br#"<foo:Signature xmlns:foo="http://wrong" Id="sig"><ds:SignedInfo/></foo:Signature>"#;
+        let xml =
+            br#"<foo:Signature xmlns:foo="http://wrong" Id="sig"><ds:SignedInfo/></foo:Signature>"#;
         assert!(extract_single_signature(xml).is_ok());
     }
 

@@ -7,7 +7,7 @@ use crate::{
     services::{crypto::pki_service::verify_signature_with_cert, xml::edit_tlv::extract_records},
 };
 
-#[instrument(skip(crypto), fields(qr_length = qr_b64.len()))]
+#[instrument(skip(qr_b64, crypto), fields(qr_length = qr_b64.len()))]
 pub fn verify_qr_signature(qr_b64: &str, crypto: &Crypto) -> anyhow::Result<()> {
     let tlv_bytes = general_purpose::STANDARD.decode(qr_b64)?;
     let records = extract_records(&tlv_bytes)?;

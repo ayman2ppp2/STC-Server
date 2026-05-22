@@ -6,7 +6,7 @@ use sqlx::{Postgres, Transaction, types::time::OffsetDateTime};
 use tracing::instrument;
 use uuid::Uuid;
 
-#[instrument]
+#[instrument(skip(crt, pool))]
 pub async fn get_device(crt: &X509, pool: &PgPool) -> anyhow::Result<Device> {
     let device_id = extract_device_id(crt)?;
     let device = fetch_device(&device_id, pool).await?;

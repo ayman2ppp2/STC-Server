@@ -30,7 +30,8 @@ pub fn clear_invoice(
     let edited_signed_properties_invoice_bytes =
         edit_signing_time(&intermediate_dto.invoice_bytes)?;
     // extract the edited signed properties
-    let signed_properties = extract_signed_properties(&edited_signed_properties_invoice_bytes, None)?;
+    let signed_properties =
+        extract_signed_properties(&edited_signed_properties_invoice_bytes, None)?;
     // hash the extracted signed properties
     let signed_properties_hash = compute_hash(&canonicalize_c14n11(signed_properties)?)?;
     // edit the signed info to add the new invoice hash and SP hash
@@ -40,8 +41,10 @@ pub fn clear_invoice(
         &signed_properties_hash,
     )?;
     // compute hash for the edited signed info
-    let signed_info_canonical =
-        &canonicalize_c14n11(extract_signed_info(&edited_signed_info_invoice_bytes, None)?)?;
+    let signed_info_canonical = &canonicalize_c14n11(extract_signed_info(
+        &edited_signed_info_invoice_bytes,
+        None,
+    )?)?;
     // let edited_qr_invoice_bytes = edit_qr(invoice_hash,signature);
     // sign the signed info hash
     let signature = sign(signed_info_canonical, crypto)?;
