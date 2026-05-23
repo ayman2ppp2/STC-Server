@@ -25,7 +25,8 @@ echo ""
 
 # Test 2: Clearance with sandbox mode (skips validation)
 echo "2. Testing clearance endpoint (sandbox mode)..."
-echo "   Sandbox mode skips: UUID check, PIH chain, database persistence"
+echo "   Sandbox mode skips: UUID check, PIH chain, persistence, ICV update"
+echo "   Sandbox mode still validates: schema, hash, signature, certificate, TINs"
 echo ""
 
 RESPONSE=$(curl -s -X POST "$BASE_URL/clear" \
@@ -42,7 +43,7 @@ echo ""
 
 # Test 3: Clearance without sandbox (requires full validation)
 echo "3. Testing clearance endpoint (production mode)..."
-echo "   Production mode validates: UUID, PIH chain, TINs, signatures"
+echo "   Production mode validates and persists invoice chain state"
 echo ""
 
 RESPONSE=$(curl -s -X POST "$BASE_URL/clear" \

@@ -1,4 +1,5 @@
 use sqlx::PgPool;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::services::crypto::pki_service::compute_hash;
@@ -8,6 +9,7 @@ pub struct OnboardingResult {
     pub token: String,
 }
 
+#[instrument(skip(pool), fields(company_id = %company_id))]
 pub async fn generate_token(company_id: &str, pool: &PgPool) -> anyhow::Result<OnboardingResult> {
     if !validate_taxpayer_exists(company_id, pool).await? {
         anyhow::bail!("Company ID not found in taxpayer registry");

@@ -6,7 +6,15 @@ use crate::services::crypto::pki_service::{compute_hash, handle_enrollment};
 use crate::services::db::device_service::create_new_device;
 use crate::services::db::tin_service::verify_supplier_tin;
 use crate::services::db::token_checking::{fetch_token, mark_token_used};
+use tracing::instrument;
 
+#[instrument(
+    skip(intermediate, crypto, pool),
+    fields(
+        device_id = ?intermediate.get_device_id().ok(),
+        tin = ?intermediate.get_tin().ok()
+    )
+)]
 pub async fn enroll_device(
     intermediate: &IntermediateEnrollDto,
     crypto: &Crypto,

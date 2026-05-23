@@ -7,11 +7,12 @@ use base64::engine::general_purpose;
 use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::models::device::Device;
-use crate::services::xml::c14n11::canonicalize_c14n11;
 use crate::services::db::device_service::get_device;
+use crate::services::xml::c14n11::canonicalize_c14n11;
 use crate::services::xml::extractors::{extract_invoice, extract_sig_crt, extract_supplier_id};
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct SubmitInvoiceDto {
@@ -20,16 +21,16 @@ pub struct SubmitInvoiceDto {
     pub invoice: String,
 }
 
-#[derive(Debug,PartialEq, Eq)]
-pub enum InvoiceType{
+#[derive(Debug, PartialEq, Eq)]
+pub enum InvoiceType {
     Reporting,
     Clearance,
 }
 
-impl InvoiceType{
-    pub fn as_str(&self)->&'static str{
+impl InvoiceType {
+    pub fn as_str(&self) -> &'static str {
         match self {
-            InvoiceType::Reporting=> "reporting",
+            InvoiceType::Reporting => "reporting",
             InvoiceType::Clearance => "clearance",
         }
     }
@@ -43,11 +44,12 @@ pub struct IntermediateInvoiceDto {
     pub invoice_signature: Vec<u8>,
     pub certificate: X509,
     pub supplier: String,
-    pub device:Device,
+    pub device: Device,
 }
 
 impl SubmitInvoiceDto {
-    pub async fn parse(self,pool:&PgPool) -> anyhow::Result<IntermediateInvoiceDto> {
+    #[instrument(skip(self, pool), fields(uuid = %self.uuid, invoice_b64_len = self.invoice.len()))]
+    pub async fn parse(self, pool: &PgPool) -> anyhow::Result<IntermediateInvoiceDto> {
         let invoice_bytes = general_purpose::STANDARD
             .decode(self.invoice)
             .context("failed to decode the the invoice")?;
@@ -74,7 +76,7 @@ impl SubmitInvoiceDto {
             .context("failed to optain a valid uuid from the provided uuid")?;
         let supplier = extract_supplier_id(&invoice_bytes)
             .context("failed to extract the company id from the invoice")?;
-        let device = get_device(&certificate,pool).await?;
+        let device = get_device(&certificate, pool).await?;
         Ok(IntermediateInvoiceDto {
             uuid,
             invoice_bytes,

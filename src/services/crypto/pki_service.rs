@@ -1,12 +1,16 @@
 use crate::config::crypto_config::Crypto;
 use crate::models::enrollment::IntermediateEnrollDto;
 
-
 use anyhow::{Context, anyhow};
 use openssl::bn::BigNum;
 use openssl::hash::hash;
 use openssl::nid::Nid;
-use openssl::{asn1::Asn1Time, hash::MessageDigest, sign::{Signer, Verifier}, x509::{X509, X509Builder, X509Req}};
+use openssl::{
+    asn1::Asn1Time,
+    hash::MessageDigest,
+    sign::{Signer, Verifier},
+    x509::{X509, X509Builder, X509Req},
+};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -106,12 +110,20 @@ pub fn verfiy_supplier_tin_with_ca(invoice_tin: &String, crt: &X509) -> anyhow::
         .as_utf8()
         .context("Failed to parse ORGANIZATIONNAME as valid UTF-8")?
         .to_string();
-    if *invoice_tin == crt_tin { Ok(())} else { Err(anyhow!("Supplier TIN mismatch expected : {}, found :{}",crt_tin,invoice_tin)) }
+    if *invoice_tin == crt_tin {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Supplier TIN mismatch expected : {}, found :{}",
+            crt_tin,
+            invoice_tin
+        ))
+    }
 }
 pub fn check_cert_serial(crt: &X509, extracted_serial: BigNum) -> anyhow::Result<bool> {
     let serial = crt.serial_number();
     let bn_serial = serial.to_bn()?;
-    
+
     Ok(bn_serial == extracted_serial)
 }
 
@@ -136,9 +148,9 @@ pub async fn sign_csr(req: &X509Req, crypto: &Crypto) -> Result<X509, openssl::e
     Ok(builder.build())
 }
 
-pub fn sign(hash: Vec<u8>, crypto: &Crypto) -> anyhow::Result<Vec<u8>> {
+pub fn sign(hash: &[u8], crypto: &Crypto) -> anyhow::Result<Vec<u8>> {
     let mut signer = Signer::new(MessageDigest::sha256(), &crypto.private_key)?;
-    signer.update(&hash)?;
+    signer.update(hash)?;
     let signature = signer.sign_to_vec()?;
     Ok(signature)
 }

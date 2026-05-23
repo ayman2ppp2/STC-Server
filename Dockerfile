@@ -68,7 +68,7 @@ USER appuser
 
 # 6. CONFIGURATION
 ENV PORT=8000
-ENV RUST_LOG=warn
+ENV RUST_LOG=stc_server=info,tracing_actix_web=info,actix_web=warn
 EXPOSE ${PORT}
 
 # 7. EXEC FORM (Better for signals)

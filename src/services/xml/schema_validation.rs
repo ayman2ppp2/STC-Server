@@ -6,7 +6,7 @@ use fastxml::{
 };
 use tracing::instrument;
 
-#[instrument(skip(schema))]
+#[instrument(skip(schema, body))]
 pub fn validate_schema(schema: Data<CompiledSchema>, body: &str) -> anyhow::Result<String> {
     let validator = XmlSchemaValidationContext::from_arc(schema.into_inner());
     let xml_doc = parse(body)?;

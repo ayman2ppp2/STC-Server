@@ -1,7 +1,29 @@
 use anyhow::{Context, bail};
 use openssl::bn::BigNum;
-use quick_xml::{Reader, Writer, events::Event};
+use quick_xml::{
+    Reader, Writer,
+    events::{BytesStart, Event},
+};
 use std::io::Cursor;
+
+const DS_NS: &[u8] = b"http://www.w3.org/2000/09/xmldsig#";
+const XADES_NS: &[u8] = b"http://uri.etsi.org/01903/v1.3.2#";
+
+fn validate_namespace(e: &BytesStart, expected_ns: &[u8]) -> anyhow::Result<()> {
+    let name_buf = e.name();
+    let qualified = name_buf.as_ref();
+    let prefix: &[u8] = match expected_ns {
+        DS_NS => b"ds:",
+        XADES_NS => b"xades:",
+        _ => return Ok(()),
+    };
+    if !qualified.starts_with(prefix) {
+        let name = std::str::from_utf8(qualified).unwrap_or("?");
+        let ns = std::str::from_utf8(expected_ns).unwrap_or("?");
+        bail!("element '{name}' does not use expected namespace {ns}");
+    }
+    Ok(())
+}
 
 #[derive(PartialEq)]
 enum State {
@@ -200,7 +222,10 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
 }
 
 /// Extracts the SignedProperties element from XML signature.
-pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
+pub fn extract_signed_properties(
+    xml: &[u8],
+    expected_ns: Option<&[u8]>,
+) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(false);
 
@@ -214,6 +239,9 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
         match reader.read_event_into(&mut buf)? {
             Event::Start(e) => {
                 if e.local_name().as_ref() == b"SignedProperties" {
+                    if let Some(ns) = expected_ns {
+                        validate_namespace(&e, ns)?;
+                    }
                     capturing = true;
                     depth = 1;
                     let mut elem = e.to_owned();
@@ -243,6 +271,68 @@ pub fn extract_signed_properties(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
             //         writer.write_event(Event::CData(e.to_owned()))?;
             //     }
             // }
+            Event::End(e) => {
+                if capturing {
+                    writer.write_event(Event::End(e.to_owned()))?;
+                    depth -= 1;
+
+                    if depth == 0 {
+                        break;
+                    }
+                }
+            }
+
+            Event::Eof => break,
+            _ => {}
+        }
+
+        buf.clear();
+    }
+
+    Ok(writer.into_inner().into_inner())
+}
+
+/// Extracts the SignedInfo element from XML signature.
+pub fn extract_signed_info(xml: &[u8], expected_ns: Option<&[u8]>) -> anyhow::Result<Vec<u8>> {
+    let mut reader = Reader::from_reader(Cursor::new(xml));
+    reader.config_mut().trim_text(false);
+
+    let mut buf = Vec::new();
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+
+    let mut capturing = false;
+    let mut depth: usize = 0;
+
+    loop {
+        match reader.read_event_into(&mut buf)? {
+            Event::Start(e) => {
+                if e.local_name().as_ref() == b"SignedInfo" {
+                    if let Some(ns) = expected_ns {
+                        validate_namespace(&e, ns)?;
+                    }
+                    capturing = true;
+                    depth = 1;
+                    let mut elem = e.to_owned();
+                    elem.push_attribute(("xmlns:ds", "http://www.w3.org/2000/09/xmldsig#"));
+                    writer.write_event(Event::Start(elem))?;
+                } else if capturing {
+                    depth += 1;
+                    writer.write_event(Event::Start(e.to_owned()))?;
+                }
+            }
+
+            Event::Empty(e) => {
+                if capturing {
+                    writer.write_event(Event::Empty(e.to_owned()))?;
+                }
+            }
+
+            Event::Text(e) => {
+                if capturing {
+                    writer.write_event(Event::Text(e.to_owned()))?;
+                }
+            }
+
             Event::End(e) => {
                 if capturing {
                     writer.write_event(Event::End(e.to_owned()))?;
@@ -612,7 +702,7 @@ mod tests {
         )
     }
     #[test]
-    fn test_extract_crt_serial(){
+    fn test_extract_crt_serial() {
         let xml = r#"        <xades:SignedSignatureProperties>
           <xades:SigningTime>2026-03-18T20:08:12Z</xades:SigningTime>
           <xades:SigningCertificate>
@@ -632,9 +722,11 @@ mod tests {
     </xades:QualifyingProperties>
   </ds:Object>
 </ds:Signature></sac:SignatureInformation></sig:UBLDocumentSignatures></ext:ExtensionContent></ext:UBLExtension></ext:UBLExtensions>"#;
-        
-    
-        assert_eq!(extract_crt_serial(xml.as_bytes()).unwrap(),BigNum::from_dec_str("2824481994976419989").unwrap());
+
+        assert_eq!(
+            extract_crt_serial(xml.as_bytes()).unwrap(),
+            BigNum::from_dec_str("2824481994976419989").unwrap()
+        );
     }
     #[test]
     fn test_extract_reporting_profile() {
@@ -815,7 +907,7 @@ mod tests {
                                 </xades:SignedProperties>
                             </xades:QualifyingProperties>"#;
 
-        assert_eq!(extract_signed_properties(xml.as_ref()).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+        assert_eq!(extract_signed_properties(xml.as_ref(), None).unwrap(),br#"<xades:SignedProperties Id="xadesSignedProperties" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
                                     <xades:SignedSignatureProperties>
                                         <xades:SigningTime>109384180981</xades:SigningTime> //the signging time (will change)
                                         <xades:SigningCertificate>

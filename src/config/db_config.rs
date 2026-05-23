@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-pub async fn db_from_env ()-> anyhow::Result<PgPool>{
+pub async fn db_from_env() -> anyhow::Result<PgPool> {
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         let db_user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "postgres".to_string());
         let db_password =
@@ -17,8 +17,5 @@ pub async fn db_from_env ()-> anyhow::Result<PgPool>{
     // println!("PORT = {:?}", std::env::var("PORT"));
     // println!("DATABASE_URL = {:?}", database_url);
 
-    Ok(PgPool::connect(&database_url)
-        .await?)
-        
-
+    Ok(PgPool::connect(&database_url).await?)
 }

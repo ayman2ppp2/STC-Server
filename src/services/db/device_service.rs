@@ -1,12 +1,12 @@
+use crate::{models::device::Device, services::crypto::pki_service::extract_device_id};
 use anyhow::Context;
 use openssl::x509::X509;
 use sqlx::PgPool;
-use sqlx::{types::time::OffsetDateTime, Postgres, Transaction};
+use sqlx::{Postgres, Transaction, types::time::OffsetDateTime};
 use tracing::instrument;
 use uuid::Uuid;
-use crate::{models::device::Device, services::crypto::pki_service::extract_device_id};
 
-#[instrument]
+#[instrument(skip(crt, pool))]
 pub async fn get_device(crt: &X509, pool: &PgPool) -> anyhow::Result<Device> {
     let device_id = extract_device_id(crt)?;
     let device = fetch_device(&device_id, pool).await?;
@@ -54,8 +54,9 @@ pub async fn create_new_device(
     tin: &str,
     pool: &PgPool,
 ) -> anyhow::Result<Device> {
-    let initial_pih: Vec<u8> = hex::decode("5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9")
-        .context("Failed to decode initial PIH hex")?;
+    let initial_pih: Vec<u8> =
+        hex::decode("5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9")
+            .context("Failed to decode initial PIH hex")?;
 
     sqlx::query!(
         r#"

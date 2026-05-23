@@ -25,10 +25,11 @@ echo ""
 
 # Test 2: Reporting with sandbox mode
 echo "2. Testing reporting endpoint (sandbox mode)..."
-echo "   Sandbox mode skips: UUID check, PIH chain, database persistence"
+echo "   Sandbox mode skips: UUID check, PIH chain, persistence, ICV update"
+echo "   Sandbox mode still validates: schema, hash, signature, certificate, TINs"
 echo ""
 
-RESPONSE=$(curl -s -X POST "$BASE_URL/reporting" \
+RESPONSE=$(curl -s -X POST "$BASE_URL/report" \
   -H "Content-Type: application/json" \
   -H "X-Sandbox-Mode: true" \
   -d "{
@@ -42,10 +43,10 @@ echo ""
 
 # Test 3: Reporting without sandbox (requires full validation)
 echo "3. Testing reporting endpoint (production mode)..."
-echo "   Production mode validates: UUID, PIH chain, TINs, signatures"
+echo "   Production mode validates and persists invoice chain state"
 echo ""
 
-RESPONSE=$(curl -s -X POST "$BASE_URL/reporting" \
+RESPONSE=$(curl -s -X POST "$BASE_URL/report" \
   -H "Content-Type: application/json" \
   -d "{
     \"invoice_hash\": \"$INVOICE_HASH\",
