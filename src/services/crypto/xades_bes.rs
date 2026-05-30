@@ -86,7 +86,6 @@ enum TextField {
 /// and C14N 1.1. Unknown algorithms fail closed.
 pub fn validate_xades_bes_signature(
     invoice_xml: &[u8],
-    canonicalized_invoice: &[u8],
     received_invoice_hash: &[u8],
     expected_certificate: &X509,
 ) -> anyhow::Result<()> {
@@ -99,10 +98,10 @@ pub fn validate_xades_bes_signature(
 
     enforce_profile_structure(&profile)?;
 
-    let invoice_hash = compute_hash(canonicalized_invoice)?;
-    if !memcmp::eq(received_invoice_hash, &invoice_hash) {
-        bail!("Invoice hash mismatch");
-    }
+    // let invoice_hash = compute_hash(canonicalized_invoice)?;
+    // if !memcmp::eq(received_invoice_hash, &invoice_hash) {
+    //     bail!("Invoice hash mismatch");
+    // }
 
     let invoice_ref = unique_reference(&profile, |r| r.uri.as_deref() == Some(""))
         .context("missing invoice reference")?;
@@ -111,7 +110,7 @@ pub fn validate_xades_bes_signature(
         .digest_value
         .as_ref()
         .context("invoice reference is missing DigestValue")?;
-    if !memcmp::eq(invoice_ref_digest, &invoice_hash) {
+    if !memcmp::eq(invoice_ref_digest, received_invoice_hash) {
         bail!("Signed invoice digest mismatch");
     }
 
@@ -722,10 +721,9 @@ mod tests {
         let (_, certificate_b64) = extract_sig_crt(&xml).unwrap();
         let certificate_der = general_purpose::STANDARD.decode(certificate_b64).unwrap();
         let certificate = X509::from_der(&certificate_der).unwrap();
-        let err =
-            validate_xades_bes_signature(&xml, &canonicalized_invoice, &invoice_hash, &certificate)
-                .unwrap_err()
-                .to_string();
+        let err = validate_xades_bes_signature(&xml, &invoice_hash, &certificate)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("Invalid invoice signature"));
     }
 

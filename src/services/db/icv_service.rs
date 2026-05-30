@@ -10,7 +10,7 @@ pub fn verify_icv(icv: i32, current_icv: i32) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[instrument(skip(tx), fields(device_uuid = %device_id, new_icv = new_icv))]
+#[instrument(skip(tx,new_pih), fields(device_uuid = %device_id, new_icv = new_icv))]
 pub async fn update_icv_and_pih<'a>(
     tx: &mut Transaction<'a, Postgres>,
     device_id: &Uuid,

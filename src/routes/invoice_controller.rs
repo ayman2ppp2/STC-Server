@@ -67,6 +67,11 @@ pub async fn clearance(
         }
     };
     if !intermediate_dto.device.is_active {
+        tracing::warn!(
+            uuid = %intermediate_dto.uuid,
+            device_uuid = %intermediate_dto.device.device_uuid,
+            "Invoice rejected because device is inactive"
+        );
         return Ok(
             HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                 success: false,
@@ -114,7 +119,12 @@ pub async fn reporting(
     crypto: web::Data<Crypto>,
     schema_validator: web::Data<CompiledSchema>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let sandbox = req.headers().contains_key("X-Sandbox-Mode");
+    let sandbox = req
+        .headers()
+        .get("X-Sandbox-Mode")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
     let dto = invoice_dto.into_inner();
     let raw_uuid = dto.uuid.clone();
 
@@ -133,6 +143,11 @@ pub async fn reporting(
     };
 
     if !intermediate_dto.device.is_active {
+        tracing::warn!(
+            uuid = %intermediate_dto.uuid,
+            device_uuid = %intermediate_dto.device.device_uuid,
+            "Invoice rejected because device is inactive"
+        );
         return Ok(
             HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
                 success: false,
@@ -155,7 +170,7 @@ pub async fn reporting(
     )
     .await
     {
-        Ok(_) => Ok(HttpResponse::Ok().json(ApiResponse::<()> {
+        Ok(_) => Ok(HttpResponse::Accepted().json(ApiResponse::<()> {
             success: true,
             message: "Invoice reported".into(),
             data: None,
