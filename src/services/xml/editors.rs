@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use base64::Engine;
 use base64::engine::general_purpose;
 use chrono::Utc;
@@ -261,9 +261,78 @@ pub fn edit_signature(xml: &[u8], signature: String) -> anyhow::Result<Vec<u8>> 
     Ok(writer.into_inner())
 }
 
+pub fn edit_certificate(xml: &[u8], certificate: String) -> anyhow::Result<Vec<u8>> {
+    let mut reader = Reader::from_reader(Cursor::new(xml));
+
+    {
+        let cfg = reader.config_mut();
+        cfg.trim_text_start = false;
+        cfg.trim_text_end = false;
+    }
+
+    let mut writer = Writer::new(Vec::new());
+    let mut buf = Vec::new();
+    let mut in_certificate = false;
+    let mut certificate_found = false;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                if e.local_name().as_ref() == b"X509Certificate" {
+                    in_certificate = true;
+                    certificate_found = true;
+                }
+
+                writer.write_event(Event::Start(e.to_owned()))?;
+            }
+
+            Ok(Event::End(e)) => {
+                if e.local_name().as_ref() == b"X509Certificate" {
+                    in_certificate = false;
+                }
+
+                writer.write_event(Event::End(e.to_owned()))?;
+            }
+
+            Ok(Event::Text(e)) => {
+                if in_certificate {
+                    writer.write_event(Event::Text(BytesText::new(&certificate)))?;
+                } else {
+                    writer.write_event(Event::Text(e.to_owned()))?;
+                }
+            }
+
+            Ok(Event::Empty(e)) => {
+                writer.write_event(Event::Empty(e.to_owned()))?;
+            }
+
+            Ok(Event::Eof) => break,
+
+            Ok(ev) => {
+                writer.write_event(ev.to_owned())?;
+            }
+
+            Err(e) => return Err(anyhow!(format!("XML parse error: {}", e))),
+        }
+
+        buf.clear();
+    }
+
+    if !certificate_found {
+        bail!("X509Certificate not found in invoice signature");
+    }
+
+    Ok(writer.into_inner())
+}
+
 // Helper to gracefully ignore XML namespaces (e.g., handles "cac:AdditionalDocumentReference" or "AdditionalDocumentReference")
 
-pub fn edit_qr(xml: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<Vec<u8>> {
+pub fn edit_qr(
+    xml: &[u8],
+    hash: &[u8],
+    signature: &[u8],
+    certificate: &[u8],
+) -> anyhow::Result<Vec<u8>> {
     // IMPORTANT: Do not configure reader.trim_text(true).
     // We must preserve exact whitespaces for signature validity.
     let mut reader = Reader::from_reader(Cursor::new(xml));
@@ -275,6 +344,8 @@ pub fn edit_qr(xml: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<Vec<
     let mut in_id_tag = false;
     let mut is_qr_block = false;
     let mut in_binary_object = false;
+    let mut qr_block_found = false;
+    let mut qr_value_edited = false;
 
     loop {
         match reader.read_event_into(&mut buf)? {
@@ -317,11 +388,13 @@ pub fn edit_qr(xml: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<Vec<
                     // Check if this AdditionalDocumentReference is specifically the "QR" one
                     if e.as_ref() == b"QR" {
                         is_qr_block = true;
+                        qr_block_found = true;
                     }
                     writer.write_event(Event::Text(e.to_owned()))?;
                 } else if in_binary_object {
                     // WE FOUND IT: Swap the old base64 text with the edited base64 text
-                    let e = edit_tlv(&e, hash, signature)?;
+                    let e = edit_tlv(&e, hash, signature, certificate)?;
+                    qr_value_edited = true;
                     writer.write_event(Event::Text(BytesText::new(&e)))?;
                 } else {
                     // Pass all other text content through completely untouched
@@ -343,6 +416,13 @@ pub fn edit_qr(xml: &[u8], hash: &[u8], signature: &[u8]) -> anyhow::Result<Vec<
         }
 
         buf.clear();
+    }
+
+    if !qr_block_found {
+        bail!("QR AdditionalDocumentReference not found");
+    }
+    if !qr_value_edited {
+        bail!("QR EmbeddedDocumentBinaryObject not found");
     }
 
     Ok(writer.into_inner())
@@ -408,12 +488,66 @@ mod tests {
         <cac:Attachment>
             <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">AW/YtNix2YPYqSDYqtmI2LHZitivINin2YTYqtmD2YbZiNmE2YjYrNmK2Kcg2KjYo9mC2LXZiSDYs9ix2LnYqSDYp9mE2YXYrdiv2YjYr9ipIHwgTWF4aW11bSBTcGVlZCBUZWNoIFN1cHBseSBMVEQCDzMxMDA5NDAxMDMwMDAwMwMTMjAyMi0wOS0wNVQxNjo1MDo0MAQENC42MAUDMC42BixrRS84Q2dEMHFYZUZnRHNPUVZzTzlWZXN2dUxhVjE5aFlUeGRteUpvYTg4PQdgTUVRQ0lCZ2ZtSXRhN2FPeU5ndVRaUXU1T3ZCUFh2M0E5blJsb3dzZjJSTnE5b3l6QWlCYno4a1ZMOWlIdEYwNTFiVmJUT3hrZzdIM3UybGcreDRSZDM3Q1VtNDV5QT09CFgwVjAQBgcqhkjOPQIBBgUrgQQACgNCAARqD+MJJBltQnk7fzrUgl4/N2CPcAeTPTAD7RatCimMjrul4UMQuWH4FrduVOCclWrFlDk8aJV2tAmRgUxbiNA5</cbc:EmbeddedDocumentBinaryObject>
         </cac:Attachment>
-    </cac:AdditionalDocumentReference>"#;
+        </cac:AdditionalDocumentReference>"#;
         let hash = [0u8; 9];
         let signature = [0u8; 17];
-        let result = edit_qr(xml, &hash, &signature).unwrap();
+        let certificate = [0u8; 23];
+        let result = edit_qr(xml, &hash, &signature, &certificate).unwrap();
         //    dbg!("left : {}",String::from_utf8_lossy(&result));
         assert_ne!(result, xml);
+    }
+
+    #[test]
+    fn test_edit_qr_rejects_missing_qr_reference() {
+        let xml = br#"<cac:AdditionalDocumentReference>
+        <cbc:ID>PIH</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">BgEBBwEC</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>"#;
+
+        let err = edit_qr(xml, &[1], &[2], &[3]).unwrap_err().to_string();
+        assert!(err.contains("QR AdditionalDocumentReference"));
+    }
+
+    #[test]
+    fn test_edit_qr_rejects_missing_qr_binary_object() {
+        let xml = br#"<cac:AdditionalDocumentReference>
+        <cbc:ID>QR</cbc:ID>
+    </cac:AdditionalDocumentReference>"#;
+
+        let err = edit_qr(xml, &[1], &[2], &[3]).unwrap_err().to_string();
+        assert!(err.contains("QR EmbeddedDocumentBinaryObject"));
+    }
+
+    #[test]
+    fn test_edit_qr_rejects_missing_certificate_tag() {
+        let xml = br#"<cac:AdditionalDocumentReference>
+        <cbc:ID>QR</cbc:ID>
+        <cac:Attachment>
+            <cbc:EmbeddedDocumentBinaryObject mimeCode="text/plain">BgEBBwEC</cbc:EmbeddedDocumentBinaryObject>
+        </cac:Attachment>
+    </cac:AdditionalDocumentReference>"#;
+
+        let err = edit_qr(xml, &[1], &[2], &[3]).unwrap_err().to_string();
+        assert!(err.contains("certificate tag"));
+    }
+
+    #[test]
+    fn test_edit_certificate_replaces_x509_certificate() {
+        let xml = br#"<ds:KeyInfo><ds:X509Data><ds:X509Certificate>old</ds:X509Certificate></ds:X509Data></ds:KeyInfo>"#;
+        let result = String::from_utf8(edit_certificate(xml, "new".to_owned()).unwrap()).unwrap();
+
+        assert!(result.contains("<ds:X509Certificate>new</ds:X509Certificate>"));
+        assert!(!result.contains(">old<"));
+    }
+
+    #[test]
+    fn test_edit_certificate_rejects_missing_x509_certificate() {
+        let err = edit_certificate(b"<root></root>", "new".to_owned())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("X509Certificate"));
     }
 
     // Comprehensive edit_signing_time test using real invoice XML

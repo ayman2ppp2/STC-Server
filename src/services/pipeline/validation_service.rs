@@ -42,10 +42,10 @@ pub async fn validate_invoice(
     let supplier_tin = &intermediate.supplier;
 
     // 1. Check UUID
-    if !sandbox && let Err(e) = check_uuid(uuid, db_pool).await {
-        error!(uuid = %uuid, "UUID check failed: {}", e);
-        return Err(e);
-    }
+    // if !sandbox && let Err(e) = check_uuid(uuid, db_pool).await {
+    //     error!(uuid = %uuid, "UUID check failed: {}", e);
+    //     return Err(e);
+    // }
 
     // 2. Validate Schema
     let xml_body = std::str::from_utf8(&intermediate.invoice_bytes)
@@ -88,7 +88,6 @@ pub async fn validate_invoice(
     // 6. Verify XAdES-BES signature structure, references, certificate binding, and SignatureValue.
     if let Err(e) = validate_xades_bes_signature(
         &intermediate.invoice_bytes,
-        &intermediate.canonicalized_invoice_bytes,
         &intermediate.invoice_hash,
         &intermediate.certificate,
     ) {

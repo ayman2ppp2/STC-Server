@@ -14,7 +14,7 @@ pub async fn verify_qr(
     match verify_qr_signature(&qr_dto.into_inner().qr_b64, crypto.get_ref()) {
         Ok(()) => Ok(HttpResponse::Ok().json(ApiResponse::<()> {
             success: true,
-            message: "verfied".into(),
+            message: "verified".into(),
             data: None,
         })),
         Err(e) => {

@@ -12,3 +12,4 @@ perf.data
 perf.data.old
 flamegraph-old1.svg
 flamegraph-old.svg
+log.json
