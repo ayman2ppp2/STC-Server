@@ -63,10 +63,7 @@ impl ApiError {
         }
 
         let error_text = error_chain_text(error);
-        if contains_any(
-            &error_text,
-            &["not found or expired", "token hash mismatch"],
-        ) {
+        if contains_any(&error_text, &["not found or expired", "token hash mismatch"]) {
             Self::new(ErrorCode::InvalidOrExpiredToken)
         } else if error_text.contains("missing the serial number") {
             Self::new(ErrorCode::CsrDeviceIdMissing)
@@ -200,7 +197,11 @@ impl ApiError {
             Self::new(ErrorCode::QrCertificateMissing)
         } else if contains_any(
             &error_text,
-            &["truncated tlv", "unsupported tlv", "tlv length overflow"],
+            &[
+                "truncated tlv",
+                "unsupported tlv",
+                "tlv length overflow",
+            ],
         ) {
             Self::new(ErrorCode::InvalidQrTlv)
         } else if error_text.contains("certificate does not match") {
@@ -376,9 +377,7 @@ impl ErrorCode {
             Self::InvoiceChainMismatch => "Invoice chain validation failed",
             Self::CustomerSupplierTinMatch => "Customer TIN cannot match supplier TIN",
             Self::CustomerTinNotRegistered => "Customer TIN not registered",
-            Self::SupplierTinMismatch => {
-                "Supplier TIN does not match invoice certificate or device"
-            }
+            Self::SupplierTinMismatch => "Supplier TIN does not match invoice certificate or device",
             Self::InvoiceSignatureInvalid => "Invoice signature or certificate is invalid",
             Self::InvoiceValidationFailed => "Invoice failed validation",
             Self::InvalidQrEncoding => "QR payload must be valid base64",
