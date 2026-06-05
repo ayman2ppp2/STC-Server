@@ -36,7 +36,6 @@ struct SignatureProfile {
     canonicalization_method: Option<String>,
     signature_method: Option<String>,
     signature_value: Option<Vec<u8>>,
-    certificate: Option<X509>,
     qualifying_target: Option<String>,
     signed_properties_id: Option<String>,
     signing_time: Option<String>,
@@ -72,7 +71,6 @@ impl SignedReference {
 #[derive(Clone, Copy)]
 enum TextField {
     SignatureValue,
-    Certificate,
     ReferenceDigest,
     CertDigest,
     IssuerName,
@@ -87,7 +85,7 @@ enum TextField {
 pub fn validate_xades_bes_signature(
     invoice_xml: &[u8],
     received_invoice_hash: &[u8],
-    expected_certificate: &X509,
+    certificate: &X509,
 ) -> anyhow::Result<()> {
     let signature_xml = extract_single_signature(invoice_xml)?;
     let signed_info = extract_signed_info(&signature_xml, Some(DS_NS.as_bytes()))
@@ -135,14 +133,6 @@ pub fn validate_xades_bes_signature(
         .context("SignedProperties reference is missing DigestValue")?;
     if !memcmp::eq(signed_properties_ref_digest, &signed_properties_hash) {
         bail!("SignedProperties digest mismatch");
-    }
-
-    let certificate = profile
-        .certificate
-        .as_ref()
-        .context("signature is missing X509Certificate")?;
-    if certificate.to_der()? != expected_certificate.to_der()? {
-        bail!("embedded signature certificate does not match parsed invoice certificate");
     }
 
     validate_certificate_binding(&profile, certificate)?;
@@ -372,7 +362,6 @@ fn parse_signature_profile(signature_xml: &[u8]) -> anyhow::Result<SignatureProf
                         text_field = Some(TextField::ReferenceDigest);
                     }
                     b"ds:SignatureValue" => text_field = Some(TextField::SignatureValue),
-                    b"ds:X509Certificate" => text_field = Some(TextField::Certificate),
                     b"xades:QualifyingProperties" => {
                         set_once(
                             &mut profile.qualifying_target,
@@ -461,7 +450,6 @@ fn parse_signature_profile(signature_xml: &[u8]) -> anyhow::Result<SignatureProf
                 }
                 b"xades:CertDigest" => in_cert_digest = false,
                 b"ds:SignatureValue"
-                | b"ds:X509Certificate"
                 | b"ds:DigestValue"
                 | b"ds:X509IssuerName"
                 | b"ds:X509SerialNumber"
@@ -494,17 +482,6 @@ fn apply_text_field(
             ),
             "SignatureValue",
         ),
-        TextField::Certificate => {
-            let der = general_purpose::STANDARD
-                .decode(text)
-                .context("invalid X509Certificate base64")?;
-            let certificate = X509::from_der(&der).context("invalid X509Certificate DER")?;
-            set_once(
-                &mut profile.certificate,
-                Some(certificate),
-                "X509Certificate",
-            )
-        }
         TextField::ReferenceDigest => {
             let reference = current_reference.context("DigestValue outside Reference")?;
             set_once(
@@ -657,7 +634,7 @@ fn set_once<T>(slot: &mut Option<T>, value: Option<T>, name: &str) -> anyhow::Re
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::xml::extractors::{extract_invoice, extract_sig_crt};
+    use crate::services::xml::extractors::{extract_crt, extract_invoice};
     use std::fs;
 
     fn valid_profile() -> SignatureProfile {
@@ -666,7 +643,6 @@ mod tests {
             canonicalization_method: Some(C14N_11.to_owned()),
             signature_method: Some(RSA_SHA256.to_owned()),
             signature_value: None,
-            certificate: None,
             qualifying_target: Some("#sig".to_owned()),
             signed_properties_id: Some("xadesSignedProperties".to_owned()),
             signing_time: Some("2026-03-18T20:08:12Z".to_owned()),
@@ -718,7 +694,7 @@ mod tests {
         let xml = fs::read("test.xml").expect("failed to read test.xml");
         let canonicalized_invoice = canonicalize_c14n11(extract_invoice(&xml).unwrap()).unwrap();
         let invoice_hash = compute_hash(&canonicalized_invoice).unwrap();
-        let (_, certificate_b64) = extract_sig_crt(&xml).unwrap();
+        let certificate_b64 = extract_crt(&xml).unwrap();
         let certificate_der = general_purpose::STANDARD.decode(certificate_b64).unwrap();
         let certificate = X509::from_der(&certificate_der).unwrap();
         let err = validate_xades_bes_signature(&xml, &invoice_hash, &certificate)

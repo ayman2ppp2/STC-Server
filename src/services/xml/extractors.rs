@@ -182,35 +182,69 @@ pub fn extract_invoice(raw_xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(writer.into_inner())
 }
 
-/// Extracts signature value and X509 certificate from signed XML.
-pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+/// Extracts the X509 certificate from signed XML.
+pub fn extract_crt(xml: &[u8]) -> anyhow::Result<Vec<u8>> {
     let mut reader = Reader::from_reader(Cursor::new(xml));
     reader.config_mut().trim_text(true);
 
     let mut buf = Vec::with_capacity(1024);
-
-    let mut current = 0u8; // 0 = none, 1 = signature, 2 = certificate
-    let mut signature = String::with_capacity(2048);
-    let mut certificate = String::with_capacity(4096);
+    let mut signature_depth = 0usize;
+    let mut key_info_depth = 0usize;
+    let mut in_certificate = false;
+    let mut current_certificate = String::with_capacity(4096);
+    let mut certificate: Option<String> = None;
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => match e.local_name().as_ref() {
-                b"SignatureValue" => current = 1,
-                b"X509Certificate" => current = 2,
-                _ => {}
-            },
+            Ok(Event::Start(e)) => {
+                let name = e.name();
+                let tag = name.as_ref();
 
-            Ok(Event::Text(e)) => {
-                let text = e.decode().context("failed to decode XML")?;
-                match current {
-                    1 => signature.push_str(&text),
-                    2 => certificate.push_str(&text),
-                    _ => {}
+                if signature_depth > 0 {
+                    signature_depth += 1;
+                } else if tag == b"ds:Signature" {
+                    signature_depth = 1;
+                }
+
+                if signature_depth > 0 {
+                    if key_info_depth > 0 {
+                        key_info_depth += 1;
+                    } else if tag == b"ds:KeyInfo" {
+                        key_info_depth = 1;
+                    }
+                }
+
+                if key_info_depth > 0 && tag == b"ds:X509Certificate" {
+                    current_certificate.clear();
+                    in_certificate = true;
                 }
             }
 
-            Ok(Event::End(_)) => current = 0,
+            Ok(Event::Text(e)) => {
+                if in_certificate {
+                    let text = e.decode().context("failed to decode XML")?;
+                    current_certificate.push_str(&text);
+                }
+            }
+
+            Ok(Event::End(e)) => {
+                let name = e.name();
+                let tag = name.as_ref();
+
+                if in_certificate && tag == b"ds:X509Certificate" {
+                    if current_certificate.is_empty() {
+                        bail!("X509Certificate is empty");
+                    }
+                    if certificate.is_some() {
+                        bail!("multiple X509Certificate elements found in signature KeyInfo");
+                    }
+                    certificate = Some(current_certificate.clone());
+                    in_certificate = false;
+                }
+
+                key_info_depth = key_info_depth.saturating_sub(1);
+                signature_depth = signature_depth.saturating_sub(1);
+            }
             Ok(Event::Eof) => break,
             Err(e) => bail!("XML error: {e}"),
             _ => {}
@@ -218,7 +252,8 @@ pub fn extract_sig_crt(xml: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
         buf.clear();
     }
 
-    Ok((signature.into(), certificate.into()))
+    let certificate = certificate.context("X509Certificate not found in signature KeyInfo")?;
+    Ok(certificate.into())
 }
 
 /// Extracts the SignedProperties element from XML signature.

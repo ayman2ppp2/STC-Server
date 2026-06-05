@@ -1,4 +1,5 @@
 use actix_web::web::Data;
+use base64::{Engine, engine::general_purpose};
 use fastxml::schema::CompiledSchema;
 use sqlx::PgPool;
 use tracing::instrument;
@@ -9,6 +10,7 @@ use crate::{
     services::{
         db::device_service::fetch_device_for_update,
         db::icv_service::{update_icv_and_pih, verify_icv},
+        db::pih_service::verify_pih,
         db::save_invoice::save_invoice,
         pipeline::clear_invoice::clear_invoice,
         pipeline::validation_service::validate_invoice,
@@ -35,18 +37,10 @@ pub async fn process_clearance(
     invoice_type: InvoiceType,
 ) -> anyhow::Result<String> {
     // Run shared pipeline
-    validate_invoice(
-        &intermediate,
-        db_pool,
-        crypto,
-        sandbox,
-        schema,
-        invoice_type,
-    )
-    .await?;
+    let hash = validate_invoice(&intermediate, db_pool, crypto, schema, invoice_type).await?;
 
     // Clearance-specific logic: Stamping
-    let (hash, cleared_invoice) = clear_invoice(&intermediate, crypto)?;
+    let (hash, cleared_invoice_bytes) = clear_invoice(&intermediate, crypto, hash)?;
 
     // Store it
     if !sandbox {
@@ -58,6 +52,9 @@ pub async fn process_clearance(
         // Verify ICV
         let icv = extract_icv(&intermediate.invoice_bytes)?;
         verify_icv(icv, device.current_icv)?;
+
+        // Verify PIH against the locked device row.
+        verify_pih(&intermediate.invoice_bytes, &device.last_pih)?;
 
         // Update ICV and PIH
         update_icv_and_pih(
@@ -71,7 +68,7 @@ pub async fn process_clearance(
         // Save invoice
         save_invoice(
             &mut tx,
-            &cleared_invoice,
+            &cleared_invoice_bytes,
             &intermediate.uuid,
             hash,
             &device.device_uuid,
@@ -81,5 +78,5 @@ pub async fn process_clearance(
 
         tx.commit().await?;
     }
-    Ok(cleared_invoice)
+    Ok(general_purpose::STANDARD.encode(cleared_invoice_bytes))
 }

@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::models::device::Device;
 use crate::services::db::device_service::get_device;
 use crate::services::xml::c14n11::canonicalize_c14n11;
-use crate::services::xml::extractors::{extract_invoice, extract_sig_crt, extract_supplier_id};
+use crate::services::xml::extractors::{extract_crt, extract_invoice, extract_supplier_id};
 #[derive(Debug, Deserialize, Serialize, FromRow)]
 pub struct SubmitInvoiceDto {
     pub uuid: String,
@@ -41,7 +41,6 @@ pub struct IntermediateInvoiceDto {
     pub invoice_bytes: Vec<u8>,
     pub canonicalized_invoice_bytes: Vec<u8>,
     pub invoice_hash: Vec<u8>,
-    pub invoice_signature: Vec<u8>,
     pub certificate: X509,
     pub supplier: String,
     pub device: Device,
@@ -53,17 +52,14 @@ impl SubmitInvoiceDto {
         let invoice_bytes = general_purpose::STANDARD
             .decode(self.invoice)
             .context("failed to decode the the invoice")?;
-        let (signature, certificate) = extract_sig_crt(&invoice_bytes)
-            .context("failed to extract the signature or the invoice")?;
+        let certificate =
+            extract_crt(&invoice_bytes).context("failed to extract the certificate")?;
         let canonicalized_invoice_bytes = canonicalize_c14n11(extract_invoice(&invoice_bytes)?)
             .context("failed to canonicalize the invoice")?;
 
         let invoice_hash = general_purpose::STANDARD
             .decode(self.invoice_hash)
             .context("failed to decode the invoice hash")?;
-        let invoice_signature = general_purpose::STANDARD
-            .decode(signature)
-            .context("failed to decode the the signature")?;
 
         let certificate = general_purpose::STANDARD
             .decode(certificate)
@@ -82,7 +78,6 @@ impl SubmitInvoiceDto {
             invoice_bytes,
             canonicalized_invoice_bytes,
             invoice_hash,
-            invoice_signature,
             certificate,
             supplier,
             device,

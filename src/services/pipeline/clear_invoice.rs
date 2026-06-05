@@ -16,9 +16,7 @@ use crate::{
         crypto::pki_service::compute_hash,
         crypto::pki_service::sign,
         xml::c14n11::canonicalize_c14n11,
-        xml::editors::{
-            edit_certificate, edit_qr, edit_signature, edit_signed_info, edit_signing_time,
-        },
+        xml::editors::{edit_qr, edit_signature, edit_signed_info, edit_signing_time},
         xml::extractors::{extract_signed_info, extract_signed_properties},
     },
 };
@@ -26,8 +24,8 @@ use crate::{
 pub fn clear_invoice(
     intermediate_dto: &IntermediateInvoiceDto,
     crypto: &Crypto,
-) -> anyhow::Result<(Vec<u8>, String)> {
-    let invoice_hash = compute_hash(&intermediate_dto.canonicalized_invoice_bytes)?;
+    invoice_hash: Vec<u8>,
+) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     // edit signing time
     let edited_signed_properties_invoice_bytes =
         edit_signing_time(&intermediate_dto.invoice_bytes)?;
@@ -51,14 +49,18 @@ pub fn clear_invoice(
     // sign the signed info hash
     let signature = sign(signed_info_canonical, crypto)?;
     let qr_signature = sign(&invoice_hash, crypto)?;
-    let certificate = crypto.certificate.to_der()?;
+    // let certificate = crypto.certificate.to_der()?;
     // base64 encoding
     let signature_b64 = general_purpose::STANDARD.encode(&signature);
-    let certificate_b64 = general_purpose::STANDARD.encode(&certificate);
+    // let certificate_b64 = general_purpose::STANDARD.encode(&certificate);
     // injecting the signature
     let signed_invoice = edit_signature(&edited_signed_info_invoice_bytes, signature_b64)?;
-    let signed_invoice = edit_certificate(&signed_invoice, certificate_b64)?;
-    let final_invoice = edit_qr(&signed_invoice, &invoice_hash, &qr_signature, &certificate)?;
-    let final_invoice_b64: String = general_purpose::STANDARD.encode(final_invoice);
-    Ok((invoice_hash, final_invoice_b64))
+    // let signed_invoice = edit_certificate(&signed_invoice, certificate_b64)?;
+    let final_invoice = edit_qr(
+        &signed_invoice,
+        &invoice_hash,
+        &qr_signature,
+        &intermediate_dto.certificate.to_der()?,
+    )?;
+    Ok((invoice_hash, final_invoice))
 }

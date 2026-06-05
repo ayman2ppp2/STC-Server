@@ -457,14 +457,13 @@ pub struct SubmitInvoiceDto {
 Parsing performs these operations before the pipeline runs:
 
 1. Base64-decodes `invoice` to XML bytes.
-2. Extracts the invoice signature and embedded certificate from XML.
+2. Extracts the embedded certificate from XML.
 3. Extracts the invoice node and canonicalizes it with C14N 1.1.
 4. Base64-decodes `invoice_hash` to raw bytes.
-5. Base64-decodes the extracted signature.
-6. Base64-decodes the extracted certificate and parses it as DER X.509.
-7. Parses `uuid` as a UUID.
-8. Extracts the supplier TIN from the invoice XML.
-9. Extracts the device UUID from the certificate subject `serialNumber` and loads the device from the database.
+5. Base64-decodes the extracted certificate and parses it as DER X.509.
+6. Parses `uuid` as a UUID.
+7. Extracts the supplier TIN from the invoice XML.
+8. Extracts the device UUID from the certificate subject `serialNumber` and loads the device from the database.
 
 ### Profile Selection
 
@@ -493,7 +492,7 @@ The exact extracted XML subtree and canonicalization path should match the serve
 
 Clearance mode returns the cleared invoice as base64 XML. During clearance, the service:
 
-1. Computes the canonical invoice hash.
+1. Reuses the canonical invoice hash computed during validation.
 2. Updates `xades:SigningTime`.
 3. Hashes canonicalized signed properties.
 4. Updates `SignedInfo` references with the invoice hash and signed-properties hash.
@@ -509,22 +508,20 @@ Reporting mode does not stamp or sign the invoice. In non-sandbox mode, it store
 
 ## Validation Pipeline
 
-The shared validation pipeline runs in this order:
+The shared validation pipeline runs stateless invoice checks in this order:
 
-1. UUID uniqueness check against `invoices`, skipped in sandbox mode.
-2. UTF-8 conversion of the invoice XML.
-3. UBL schema validation.
-4. Invoice type/profile validation.
-5. SHA-256 invoice hash verification against `invoice_hash`.
-6. PIH chain verification, skipped in sandbox mode.
-7. XAdES-BES signature validation.
-8. Certificate validity and CA signature verification using the server certificate.
-9. Supplier TIN binding check between invoice XML and certificate `organizationName`.
-10. Supplier TIN existence check against `taxpayers`.
-11. Customer TIN existence check for clearance invoices only.
-12. Customer TIN must not equal supplier TIN for clearance invoices only.
+1. UTF-8 conversion of the invoice XML.
+2. UBL schema validation.
+3. Invoice type/profile validation.
+4. SHA-256 invoice hash verification against `invoice_hash`.
+5. XAdES-BES signature validation.
+6. Certificate validity and CA signature verification using the server certificate.
+7. Supplier TIN binding check between invoice XML and certificate `organizationName`.
+8. Supplier TIN ownership check against the enrolled device `tin`.
+9. Customer TIN existence check for clearance invoices only.
+10. Customer TIN must not equal supplier TIN for clearance invoices only.
 
-After shared validation, non-sandbox clearance and reporting both lock the device row, verify ICV, update ICV and PIH, save the invoice, and commit the transaction.
+After shared validation, non-sandbox clearance and reporting both lock the device row, verify ICV and PIH against the locked row, update ICV and PIH, save the invoice, and commit the transaction. Duplicate invoice UUIDs are rejected by the database insert constraint.
 
 ## Sandbox Mode
 
@@ -532,8 +529,7 @@ Sandbox mode is intended for validating invoice structure and signatures without
 
 Skipped in sandbox mode:
 
-- UUID uniqueness check.
-- PIH chain verification.
+- Locked ICV/PIH chain verification.
 - Database persistence of the invoice.
 - ICV verification and update.
 - Device PIH update.
@@ -548,7 +544,7 @@ Still performed in sandbox mode:
 - Invoice hash verification.
 - XAdES-BES validation.
 - Certificate verification.
-- Supplier TIN checks.
+- Supplier certificate/device TIN checks.
 - Customer TIN checks for clearance invoices.
 - Clearance stamping/signing for `/clear` responses.
 
@@ -557,7 +553,7 @@ Header behavior differs by route:
 | Route | Sandbox condition |
 |-------|-------------------|
 | `/clear` | Header `X-Sandbox-Mode` exists and value equals `true` case-insensitively. |
-| `/report` | Header `X-Sandbox-Mode` exists with any value. |
+| `/report` | Header `X-Sandbox-Mode` exists and value equals `true` case-insensitively. |
 
 ## Database Schema
 
@@ -643,9 +639,10 @@ Non-sandbox invoice persistence uses a database transaction:
 1. Begin transaction.
 2. Fetch the device row with `FOR UPDATE`.
 3. Extract and verify invoice ICV against the locked row.
-4. Update device ICV and PIH.
-5. Insert invoice row.
-6. Commit transaction.
+4. Extract and verify invoice PIH against the locked row.
+5. Update device ICV and PIH.
+6. Insert invoice row.
+7. Commit transaction.
 
 This prevents concurrent submissions for the same device from racing the ICV/PIH update.
 

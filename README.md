@@ -210,7 +210,7 @@ Clearance mode uses `POST /clear` and expects a clearance invoice profile. The s
 
 Reporting mode uses `POST /report` and expects a reporting invoice profile. The server validates the invoice, stores the submitted invoice, and returns an acknowledgement without stamping/signing it.
 
-Sandbox mode is controlled by the `X-Sandbox-Mode` header. In sandbox mode, UUID uniqueness checks, PIH checks, database persistence, and ICV updates are skipped. Schema, hash, XAdES-BES, certificate, and TIN validation still run.
+Sandbox mode is controlled by the `X-Sandbox-Mode` header. In sandbox mode, locked ICV/PIH checks, database persistence, and chain-state updates are skipped. Schema, hash, XAdES-BES, certificate, and TIN validation still run.
 
 ## Database
 
