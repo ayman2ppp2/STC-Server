@@ -2,6 +2,7 @@ use actix_web::{App, HttpMessage, HttpServer, dev::Service, http::header, web};
 use stc_server::{
     config::crypto_config::Crypto,
     config::{db_config, xsd_config::schema_validator_from_temp},
+    errors::json_error_handler,
     routes::{
         enroll::enroll,
         health_check::{health_check, hello},
@@ -90,7 +91,11 @@ async fn main() -> std::io::Result<()> {
             .app_data(xsd_schema.clone())
             .app_data(pool_data.clone())
             .app_data(crypto_data.clone())
-            .app_data(web::JsonConfig::default().limit(256 * 1024))
+            .app_data(
+                web::JsonConfig::default()
+                    .limit(256 * 1024)
+                    .error_handler(json_error_handler),
+            )
             .route("/", web::get().to(hello))
             .route("/health_check", web::get().to(health_check))
             .route("/clear", web::post().to(clearance))

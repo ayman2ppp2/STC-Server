@@ -1,4 +1,3 @@
-pub mod check_uuid;
 pub mod device_service;
 pub mod icv_service;
 pub mod pih_service;
