@@ -6,3 +6,13 @@ pub struct ApiResponse<T> {
     pub message: String,
     pub data: Option<T>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct ErrorData {
+    pub error: ErrorInfo,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ErrorInfo {
+    pub code: &'static str,
+}

@@ -93,7 +93,19 @@ Most API responses use this generic shape:
 }
 ```
 
-Errors usually return `success: false` through `ApiResponse<T>`. All pipeline errors generally return `data: null`.
+Errors return `success: false` through `ApiResponse<T>` with a sanitized message and stable error code. Detailed implementation errors are logged server-side and are not exposed to clients.
+
+```json
+{
+  "success": false,
+  "message": "Request body must be valid JSON",
+  "data": {
+    "error": {
+      "code": "invalid_json"
+    }
+  }
+}
+```
 
 ## Endpoints
 
@@ -157,15 +169,15 @@ Success response:
 
 Invalid TIN response:
 
-```http
-400 Bad Request
-```
-
 ```json
 {
   "success": false,
-  "message": "Invalid company ID",
-  "data": null
+  "message": "Company ID is not registered",
+  "data": {
+    "error": {
+      "code": "company_id_not_registered"
+    }
+  }
 }
 ```
 
@@ -206,8 +218,12 @@ Error responses include:
 ```json
 {
   "success": false,
-  "message": "CSR Parsing Error",
-  "data": null
+  "message": "CSR is invalid",
+  "data": {
+    "error": {
+      "code": "invalid_csr"
+    }
+  }
 }
 ```
 
@@ -215,7 +231,11 @@ Error responses include:
 {
   "success": false,
   "message": "Invalid or expired token",
-  "data": null
+  "data": {
+    "error": {
+      "code": "invalid_or_expired_token"
+    }
+  }
 }
 ```
 
@@ -223,15 +243,23 @@ Error responses include:
 {
   "success": false,
   "message": "Supplier TIN not registered",
-  "data": null
+  "data": {
+    "error": {
+      "code": "supplier_tin_not_registered"
+    }
+  }
 }
 ```
 
 ```json
 {
   "success": false,
-  "message": "Enrollment failed",
-  "data": null
+  "message": "Device is already enrolled",
+  "data": {
+    "error": {
+      "code": "device_already_enrolled"
+    }
+  }
 }
 ```
 
@@ -276,7 +304,11 @@ Invalid parse response:
 {
   "success": false,
   "message": "Invalid invoice data",
-  "data": null
+  "data": {
+    "error": {
+      "code": "invalid_invoice_data"
+    }
+  }
 }
 ```
 
@@ -286,7 +318,11 @@ Inactive device response:
 {
   "success": false,
   "message": "Device is not enabled",
-  "data": null
+  "data": {
+    "error": {
+      "code": "device_inactive"
+    }
+  }
 }
 ```
 
@@ -295,9 +331,11 @@ Pipeline failure response:
 ```json
 {
   "success": false,
-  "message": "Clearance failed",
+  "message": "Invoice failed validation",
   "data": {
-    "error": "error details"
+    "error": {
+      "code": "invoice_validation_failed"
+    }
   }
 }
 ```
@@ -341,7 +379,11 @@ Invalid parse response:
 {
   "success": false,
   "message": "Invalid invoice data",
-  "data": null
+  "data": {
+    "error": {
+      "code": "invalid_invoice_data"
+    }
+  }
 }
 ```
 
@@ -350,8 +392,12 @@ Pipeline failure response:
 ```json
 {
   "success": false,
-  "message": "Reporting failed",
-  "data": null
+  "message": "Invoice failed validation",
+  "data": {
+    "error": {
+      "code": "invoice_validation_failed"
+    }
+  }
 }
 ```
 
@@ -371,8 +417,16 @@ Failure response:
 500 Internal Server Error
 ```
 
-```text
-Failed to fetch invoices
+```json
+{
+  "success": false,
+  "message": "Internal server error",
+  "data": {
+    "error": {
+      "code": "internal_server_error"
+    }
+  }
+}
 ```
 
 ### POST `/verify_qr`
@@ -392,12 +446,10 @@ Success response:
 ```json
 {
   "success": true,
-  "message": "verfied",
+  "message": "verified",
   "data": null
 }
 ```
-
-The success message currently contains the typo `verfied`.
 
 Failure response:
 
@@ -405,7 +457,11 @@ Failure response:
 {
   "success": false,
   "message": "QR verification failed",
-  "data": null
+  "data": {
+    "error": {
+      "code": "qr_verification_failed"
+    }
+  }
 }
 ```
 
@@ -651,8 +707,7 @@ This prevents concurrent submissions for the same device from racing the ICV/PIH
 - The server starts only after it connects to PostgreSQL, runs migrations, loads crypto material, and compiles/loads the XSD schema validator.
 - The JSON request limit is `256 KiB`; larger invoices will be rejected by Actix before route logic runs.
 - `GET /get_invoices` is a debug helper and should not be exposed in a production deployment.
-- `POST /clear` currently exposes internal error text in `data.error`; harden this before production.
-- `POST /verify_qr` currently returns the success message `verfied`.
+- Error responses expose sanitized messages and stable error codes; detailed implementation errors remain in server logs.
 - The onboarding HTML includes fields beyond what the JSON route currently uses.
 - The repository integration shell scripts are useful development helpers but are not the source of truth for endpoint contracts.
 

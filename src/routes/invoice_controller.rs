@@ -2,10 +2,10 @@ use actix_web::{HttpRequest, HttpResponse, web};
 use fastxml::schema::CompiledSchema;
 use serde_json::json;
 use sqlx::PgPool;
-use tracing;
 
 use crate::{
     config::crypto_config::Crypto,
+    errors::{ApiError, ErrorCode},
     models::{
         responses::ApiResponse,
         submit_invoice::{InvoiceType, SubmitInvoiceDto},
@@ -16,7 +16,7 @@ use crate::{
     },
 };
 
-pub async fn get_invoices(db: web::Data<PgPool>) -> impl actix_web::Responder {
+pub async fn get_invoices(db: web::Data<PgPool>) -> Result<HttpResponse, ApiError> {
     let result = sqlx::query(
         r#"
         SELECT
@@ -29,10 +29,10 @@ pub async fn get_invoices(db: web::Data<PgPool>) -> impl actix_web::Responder {
     .await;
 
     match result {
-        Ok(invoices) => HttpResponse::Ok().json(invoices.len()),
+        Ok(invoices) => Ok(HttpResponse::Ok().json(invoices.len())),
         Err(e) => {
             tracing::error!(?e, "DB error in get_invoices");
-            HttpResponse::InternalServerError().body("Failed to fetch invoices")
+            Err(ApiError::internal())
         }
     }
 }
@@ -43,48 +43,29 @@ pub async fn clearance(
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
     schema_validator: web::Data<CompiledSchema>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let sandbox = req
-        .headers()
-        .get("X-Sandbox-Mode")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
+) -> Result<HttpResponse, ApiError> {
+    let sandbox = sandbox_mode(&req);
     let dto = invoice_dto.into_inner();
     let raw_uuid = dto.uuid.clone();
 
-    let intermediate_dto = match dto.parse(&db_pool).await {
-        Ok(dto) => dto,
-        Err(e) => {
-            tracing::error!(uuid = %raw_uuid, error = %e, "Failed to parse clearance invoice");
-            return Ok(
-                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Invalid invoice data".into(),
-                    data: None,
-                }),
-            );
-        }
-    };
+    let intermediate_dto = dto.parse(&db_pool).await.map_err(|e| {
+        tracing::error!(uuid = %raw_uuid, error = %e, "Failed to parse clearance invoice");
+        ApiError::from_invoice_parse(&e)
+    })?;
+
     if !intermediate_dto.device.is_active {
         tracing::warn!(
             uuid = %intermediate_dto.uuid,
             device_uuid = %intermediate_dto.device.device_uuid,
             "Invoice rejected because device is inactive"
         );
-        return Ok(
-            HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "Device is not enabled".into(),
-                data: None,
-            }),
-        );
+        return Err(ApiError::new(ErrorCode::DeviceInactive));
     }
 
     let uuid = intermediate_dto.uuid;
     let device_uuid = intermediate_dto.device.device_uuid;
 
-    match process_clearance(
+    let cleared_invoice = process_clearance(
         intermediate_dto,
         &db_pool,
         &crypto,
@@ -93,23 +74,16 @@ pub async fn clearance(
         InvoiceType::Clearance,
     )
     .await
-    {
-        Ok(cleared_invoice) => Ok(HttpResponse::Ok().json(ApiResponse {
-            success: true,
-            message: "Invoice cleared".into(),
-            data: Some(json!({"cleared_invoice": cleared_invoice})),
-        })),
-        Err(e) => {
-            tracing::error!(uuid = %uuid, device_uuid = %device_uuid, error = %e, "Clearance pipeline failed");
-            Ok(
-                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Clearance failed".into(),
-                    data: None,
-                }),
-            )
-        }
-    }
+    .map_err(|e| {
+        tracing::error!(uuid = %uuid, device_uuid = %device_uuid, error = %e, "Clearance pipeline failed");
+        ApiError::from_invoice_pipeline(&e)
+    })?;
+
+    Ok(HttpResponse::Ok().json(ApiResponse {
+        success: true,
+        message: "Invoice cleared".into(),
+        data: Some(json!({"cleared_invoice": cleared_invoice})),
+    }))
 }
 
 pub async fn reporting(
@@ -118,29 +92,15 @@ pub async fn reporting(
     invoice_dto: web::Json<SubmitInvoiceDto>,
     crypto: web::Data<Crypto>,
     schema_validator: web::Data<CompiledSchema>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let sandbox = req
-        .headers()
-        .get("X-Sandbox-Mode")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
+) -> Result<HttpResponse, ApiError> {
+    let sandbox = sandbox_mode(&req);
     let dto = invoice_dto.into_inner();
     let raw_uuid = dto.uuid.clone();
 
-    let intermediate_dto = match dto.parse(&db_pool).await {
-        Ok(dto) => dto,
-        Err(e) => {
-            tracing::error!(uuid = %raw_uuid, error = %e, "Failed to parse reporting invoice");
-            return Ok(
-                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Invalid invoice data".into(),
-                    data: None,
-                }),
-            );
-        }
-    };
+    let intermediate_dto = dto.parse(&db_pool).await.map_err(|e| {
+        tracing::error!(uuid = %raw_uuid, error = %e, "Failed to parse reporting invoice");
+        ApiError::from_invoice_parse(&e)
+    })?;
 
     if !intermediate_dto.device.is_active {
         tracing::warn!(
@@ -148,19 +108,13 @@ pub async fn reporting(
             device_uuid = %intermediate_dto.device.device_uuid,
             "Invoice rejected because device is inactive"
         );
-        return Ok(
-            HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                success: false,
-                message: "Device is not enabled".into(),
-                data: None,
-            }),
-        );
+        return Err(ApiError::new(ErrorCode::DeviceInactive));
     }
 
     let uuid = intermediate_dto.uuid;
     let device_uuid = intermediate_dto.device.device_uuid;
 
-    match process_reporting(
+    process_reporting(
         intermediate_dto,
         &db_pool,
         &crypto,
@@ -169,21 +123,21 @@ pub async fn reporting(
         InvoiceType::Reporting,
     )
     .await
-    {
-        Ok(_) => Ok(HttpResponse::Accepted().json(ApiResponse::<()> {
-            success: true,
-            message: "Invoice reported".into(),
-            data: None,
-        })),
-        Err(e) => {
-            tracing::error!(uuid = %uuid, device_uuid = %device_uuid, error = %e, "Reporting pipeline failed");
-            Ok(
-                HttpResponse::BadRequest().json(ApiResponse::<serde_json::Value> {
-                    success: false,
-                    message: "Reporting failed".into(),
-                    data: None,
-                }),
-            )
-        }
-    }
+    .map_err(|e| {
+        tracing::error!(uuid = %uuid, device_uuid = %device_uuid, error = %e, "Reporting pipeline failed");
+        ApiError::from_invoice_pipeline(&e)
+    })?;
+
+    Ok(HttpResponse::Accepted().json(ApiResponse::<()> {
+        success: true,
+        message: "Invoice reported".into(),
+        data: None,
+    }))
+}
+
+fn sandbox_mode(req: &HttpRequest) -> bool {
+    req.headers()
+        .get("X-Sandbox-Mode")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.eq_ignore_ascii_case("true"))
 }
