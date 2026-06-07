@@ -16,7 +16,7 @@ pub async fn db_from_env() -> anyhow::Result<PgPool> {
         )
     });
 
-    let max_connections = env_u32("DB_MAX_CONNECTIONS", 20);
+    let max_connections = env_u32("DB_MAX_CONNECTIONS", 40);
     let min_connections = env_u32("DB_MIN_CONNECTIONS", 10).min(max_connections);
     let acquire_timeout_secs = env_u64("DB_ACQUIRE_TIMEOUT_SECS", 5);
     let idle_timeout_secs = env_u64("DB_IDLE_TIMEOUT_SECS", 300);

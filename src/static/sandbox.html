@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>STC E-Invoicing Sandbox</title>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family:
+                    Inter, "Segoe UI", Arial, sans-serif;
+                color: #142235;
+                background: #eef3f8;
+            }
+            header {
+                background: #091a2b;
+                color: #ffffff;
+                padding: 18px 24px;
+            }
+            .topbar,
+            main {
+                max-width: 1240px;
+                margin: 0 auto;
+            }
+            .topbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+            }
+            .brand {
+                font-weight: 800;
+                letter-spacing: 0.02em;
+            }
+            nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            nav a {
+                color: #ffffff;
+                text-decoration: none;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 999px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            main {
+                padding: 30px 24px 72px;
+            }
+            .intro {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 360px;
+                gap: 18px;
+                margin-bottom: 18px;
+            }
+            .card {
+                background: #ffffff;
+                border: 1px solid #dce6ef;
+                border-radius: 22px;
+                padding: 24px;
+                box-shadow: 0 16px 44px rgba(20, 34, 53, 0.07);
+            }
+            h1,
+            h2,
+            h3 {
+                margin-top: 0;
+                color: #091a2b;
+            }
+            h1 {
+                font-size: clamp(34px, 5vw, 58px);
+                line-height: 1;
+                letter-spacing: -0.045em;
+                margin-bottom: 16px;
+            }
+            p {
+                color: #52687e;
+                line-height: 1.65;
+            }
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 18px;
+            }
+            .wide {
+                grid-column: 1 / -1;
+            }
+            label {
+                display: block;
+                margin: 14px 0 7px;
+                color: #40576d;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            input,
+            textarea,
+            select {
+                width: 100%;
+                border: 1px solid #ccd9e5;
+                border-radius: 12px;
+                padding: 11px 12px;
+                font: inherit;
+                background: #ffffff;
+            }
+            textarea {
+                min-height: 138px;
+                resize: vertical;
+                font-family: "SFMono-Regular", Consolas, monospace;
+                font-size: 13px;
+                line-height: 1.55;
+            }
+            .short {
+                min-height: 76px;
+            }
+            button,
+            .button {
+                border: 0;
+                border-radius: 12px;
+                padding: 11px 14px;
+                font: inherit;
+                font-weight: 800;
+                cursor: pointer;
+                background: #0b3b5b;
+                color: #ffffff;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            button:disabled {
+                cursor: default;
+                opacity: 0.55;
+            }
+            .secondary {
+                background: #ffffff;
+                color: #0b3b5b;
+                border: 1px solid #b9cede;
+            }
+            .danger {
+                background: #9b2335;
+            }
+            .actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-top: 14px;
+            }
+            .code {
+                white-space: pre-wrap;
+                word-break: break-word;
+                border-radius: 14px;
+                background: #0f2030;
+                color: #e8f1f5;
+                padding: 14px;
+                font-family: "SFMono-Regular", Consolas, monospace;
+                font-size: 13px;
+                line-height: 1.55;
+                min-height: 54px;
+            }
+            .status {
+                border-radius: 14px;
+                padding: 13px;
+                font-size: 14px;
+                line-height: 1.55;
+                margin-top: 14px;
+            }
+            .success {
+                background: #edf8f2;
+                border: 1px solid #cdebd7;
+                color: #246340;
+            }
+            .error {
+                background: #fff1f2;
+                border: 1px solid #f2ccd2;
+                color: #9b2335;
+            }
+            .info {
+                background: #edf5ff;
+                border: 1px solid #c9ddf4;
+                color: #244b73;
+            }
+            .pill-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 0;
+                margin: 18px 0 0;
+                list-style: none;
+            }
+            .pill-list li {
+                border-radius: 999px;
+                background: #e9f2f2;
+                color: #244b56;
+                padding: 8px 11px;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            .two {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+            }
+            .muted {
+                color: #718397;
+                font-size: 13px;
+            }
+            @media (max-width: 940px) {
+                .topbar,
+                .intro,
+                .grid,
+                .two {
+                    display: grid;
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="topbar">
+                <div class="brand">STC Sandbox</div>
+                <nav>
+                    <a href="/">Home</a>
+                    <a href="/e-invoicing">E-Invoicing</a>
+                    <a href="/api">API Reference</a>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            <section class="intro">
+                <article class="card">
+                    <h1>Sandbox developer console</h1>
+                    <p>
+                        Use this console to test the STC e-invoicing integration
+                        flow with sandbox mode enabled. It helps prepare device
+                        enrollment, submit signed UBL invoices for clearance or
+                        reporting, inspect responses, and copy matching curl
+                        commands.
+                    </p>
+                    <ul class="pill-list">
+                        <li>Device enrollment</li>
+                        <li>Canonical invoice hash</li>
+                        <li>Clearance sandbox</li>
+                        <li>Reporting sandbox</li>
+                        <li>Request inspector</li>
+                    </ul>
+                </article>
+
+                <aside class="card">
+                    <h2>Sandbox behavior</h2>
+                    <p>
+                        The backend still validates XML schema, invoice hash,
+                        XAdES-BES signature, certificate chain, enrolled device,
+                        and taxpayer TIN rules. Sandbox mode skips invoice
+                        persistence and ICV/PIH chain-state mutation.
+                    </p>
+                    <p class="muted">
+                        Signed invoices must contain a certificate issued through
+                        this server's enrollment flow.
+                    </p>
+                </aside>
+            </section>
+
+            <section class="grid">
+                <article class="card">
+                    <h2>1. Environment</h2>
+                    <label for="baseUrl">Base URL</label>
+                    <input id="baseUrl" />
+
+                    <div class="two">
+                        <div>
+                            <label for="tin">Taxpayer TIN</label>
+                            <input id="tin" value="100011" />
+                        </div>
+                        <div>
+                            <label for="deviceUuid">Device UUID</label>
+                            <input id="deviceUuid" />
+                        </div>
+                    </div>
+
+                    <label for="enrollmentToken">Enrollment token from e-invoicing portal</label>
+                    <input id="enrollmentToken" placeholder="100011:token-uuid" />
+
+                    <div class="actions">
+                        <button onclick="generateDeviceUuid()">Generate device UUID</button>
+                        <a class="button secondary" href="/e-invoicing">Generate token</a>
+                    </div>
+                </article>
+
+                <article class="card">
+                    <h2>2. Generate CSR command</h2>
+                    <p>
+                        Run this locally to generate a private key and a base64
+                        DER CSR. Keep the private key with your test device.
+                    </p>
+                    <div id="csrCommand" class="code"></div>
+                    <div class="actions">
+                        <button onclick="refreshCsrCommand()">Refresh command</button>
+                        <button class="secondary" onclick="copyFrom('csrCommand')">Copy command</button>
+                    </div>
+                </article>
+
+                <article class="card">
+                    <h2>3. Enroll device</h2>
+                    <label for="csrB64">Base64 DER CSR</label>
+                    <textarea id="csrB64" class="short" placeholder="Paste device.csr.b64 contents here"></textarea>
+                    <div class="actions">
+                        <button id="enrollBtn" onclick="enrollDevice()">Enroll device</button>
+                        <button class="secondary" onclick="copyCurl('enroll')">Copy enroll curl</button>
+                    </div>
+                    <label for="certificatePem">Issued certificate</label>
+                    <textarea id="certificatePem" placeholder="Enrollment response certificate appears here"></textarea>
+                    <div id="enrollStatus"></div>
+                </article>
+
+                <article class="card">
+                    <h2>4. Prepare invoice</h2>
+                    <label for="invoiceFile">Upload signed UBL invoice XML</label>
+                    <input id="invoiceFile" type="file" accept=".xml,text/xml,application/xml" onchange="loadInvoiceFile(event)" />
+                    <label for="invoiceXml">Signed invoice XML</label>
+                    <textarea id="invoiceXml" placeholder="Paste signed UBL invoice XML here"></textarea>
+                    <div class="actions">
+                        <button id="prepareBtn" onclick="prepareInvoice()">Prepare payload</button>
+                        <button class="secondary" onclick="clearInvoiceFields()">Clear invoice</button>
+                    </div>
+                    <div id="prepareStatus"></div>
+                </article>
+
+                <article class="card wide">
+                    <h2>5. Submit sandbox invoice</h2>
+                    <div class="two">
+                        <div>
+                            <label for="invoiceEndpoint">Submission type</label>
+                            <select id="invoiceEndpoint" onchange="refreshInvoiceCurl()">
+                                <option value="clear">Clearance</option>
+                                <option value="report">Reporting</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="invoiceUuid">Invoice UUID</label>
+                            <input id="invoiceUuid" />
+                        </div>
+                    </div>
+
+                    <div class="two">
+                        <div>
+                            <label for="invoiceHash">Canonical invoice hash, base64</label>
+                            <textarea id="invoiceHash" class="short" placeholder="Prepared automatically"></textarea>
+                        </div>
+                        <div>
+                            <label for="invoiceB64">Invoice XML, base64</label>
+                            <textarea id="invoiceB64" class="short" placeholder="Prepared automatically"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button id="submitInvoiceBtn" onclick="submitInvoice()">Submit with sandbox mode</button>
+                        <button class="secondary" onclick="copyCurl('invoice')">Copy invoice curl</button>
+                    </div>
+
+                    <h3>Last request</h3>
+                    <div id="lastRequest" class="code">No request sent yet.</div>
+                    <h3>Last response</h3>
+                    <div id="lastResponse" class="code">No response received yet.</div>
+                    <div id="submitStatus"></div>
+                </article>
+            </section>
+        </main>
+
+        <script>
+            const state = {
+                last: {
+                    enroll: null,
+                    invoice: null,
+                },
+            };
+
+            document.addEventListener("DOMContentLoaded", () => {
+                document.getElementById("baseUrl").value = window.location.origin;
+                generateDeviceUuid();
+                document.getElementById("invoiceUuid").value = crypto.randomUUID();
+                refreshCsrCommand();
+            });
+
+            function generateDeviceUuid() {
+                document.getElementById("deviceUuid").value = crypto.randomUUID();
+                refreshCsrCommand();
+            }
+
+            function refreshCsrCommand() {
+                const tin = field("tin") || "100011";
+                const deviceUuid = field("deviceUuid") || "replace-device-uuid";
+                const command = `openssl genrsa -out device.key 2048
+openssl req -new \\
+  -key device.key \\
+  -outform DER \\
+  -subj "/O=${tin}/serialNumber=${deviceUuid}" \\
+  | base64 -w 0 > device.csr.b64`;
+                document.getElementById("csrCommand").textContent = command;
+            }
+
+            async function enrollDevice() {
+                const token = field("enrollmentToken");
+                const csr = field("csrB64");
+                if (!token || !csr) {
+                    setStatus("enrollStatus", "error", "Enrollment token and CSR are required.");
+                    return;
+                }
+
+                const button = document.getElementById("enrollBtn");
+                button.disabled = true;
+                button.textContent = "Enrolling...";
+
+                const request = {
+                    method: "POST",
+                    url: urlFor("/enroll"),
+                    headers: { "Content-Type": "application/json" },
+                    body: { token, csr },
+                };
+                state.last.enroll = request;
+
+                try {
+                    const response = await fetch(request.url, {
+                        method: request.method,
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
+                    });
+                    const payload = await safeJson(response);
+                    showInspector(request, response, payload);
+                    if (!response.ok) {
+                        setStatus("enrollStatus", "error", payload.message || "Enrollment failed.");
+                        return;
+                    }
+                    document.getElementById("certificatePem").value = payload.data.certificate || "";
+                    setStatus("enrollStatus", "success", "Device enrolled. Use the issued certificate in signed test invoices.");
+                } catch (error) {
+                    setStatus("enrollStatus", "error", "Network error: " + error.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Enroll device";
+                }
+            }
+
+            async function loadInvoiceFile(event) {
+                const file = event.target.files[0];
+                if (!file) {
+                    return;
+                }
+                document.getElementById("invoiceXml").value = await file.text();
+                setStatus("prepareStatus", "info", "Invoice file loaded. Prepare the payload before submission.");
+            }
+
+            async function prepareInvoice() {
+                const invoiceXml = field("invoiceXml");
+                if (!invoiceXml) {
+                    setStatus("prepareStatus", "error", "Paste or upload signed invoice XML first.");
+                    return false;
+                }
+
+                const button = document.getElementById("prepareBtn");
+                button.disabled = true;
+                button.textContent = "Preparing...";
+
+                try {
+                    const response = await fetch(urlFor("/sandbox/invoice-payload"), {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ invoice_xml: invoiceXml }),
+                    });
+                    const payload = await safeJson(response);
+                    if (!response.ok) {
+                        setStatus("prepareStatus", "error", payload.message || "Invoice preparation failed.");
+                        return false;
+                    }
+                    document.getElementById("invoiceHash").value = payload.data.invoice_hash;
+                    document.getElementById("invoiceB64").value = payload.data.invoice;
+                    setStatus("prepareStatus", "success", "Invoice payload and canonical hash prepared.");
+                    refreshInvoiceCurl();
+                    return true;
+                } catch (error) {
+                    setStatus("prepareStatus", "error", "Network error: " + error.message);
+                    return false;
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Prepare payload";
+                }
+            }
+
+            async function submitInvoice() {
+                if (!field("invoiceHash") || !field("invoiceB64")) {
+                    const prepared = await prepareInvoice();
+                    if (!prepared) {
+                        return;
+                    }
+                }
+
+                const endpoint = field("invoiceEndpoint");
+                const body = {
+                    uuid: field("invoiceUuid"),
+                    invoice_hash: field("invoiceHash"),
+                    invoice: field("invoiceB64"),
+                };
+                if (!body.uuid || !body.invoice_hash || !body.invoice) {
+                    setStatus("submitStatus", "error", "UUID, invoice hash, and invoice payload are required.");
+                    return;
+                }
+
+                const button = document.getElementById("submitInvoiceBtn");
+                button.disabled = true;
+                button.textContent = "Submitting...";
+
+                const request = {
+                    method: "POST",
+                    url: urlFor("/" + endpoint),
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Sandbox-Mode": "true",
+                    },
+                    body,
+                };
+                state.last.invoice = request;
+
+                try {
+                    const response = await fetch(request.url, {
+                        method: request.method,
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
+                    });
+                    const payload = await safeJson(response);
+                    showInspector(request, response, payload);
+                    if (!response.ok) {
+                        setStatus("submitStatus", "error", payload.message || "Sandbox submission failed.");
+                        return;
+                    }
+                    setStatus("submitStatus", "success", endpoint === "clear" ? "Invoice cleared in sandbox mode." : "Invoice reported in sandbox mode.");
+                } catch (error) {
+                    setStatus("submitStatus", "error", "Network error: " + error.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Submit with sandbox mode";
+                }
+            }
+
+            function refreshInvoiceCurl() {
+                const endpoint = field("invoiceEndpoint") || "clear";
+                state.last.invoice = {
+                    method: "POST",
+                    url: urlFor("/" + endpoint),
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Sandbox-Mode": "true",
+                    },
+                    body: {
+                        uuid: field("invoiceUuid"),
+                        invoice_hash: field("invoiceHash"),
+                        invoice: field("invoiceB64"),
+                    },
+                };
+            }
+
+            function copyCurl(type) {
+                if (type === "invoice") {
+                    refreshInvoiceCurl();
+                }
+                const request = state.last[type];
+                if (!request) {
+                    return;
+                }
+                navigator.clipboard.writeText(toCurl(request));
+            }
+
+            function copyFrom(id) {
+                navigator.clipboard.writeText(document.getElementById(id).textContent);
+            }
+
+            function clearInvoiceFields() {
+                document.getElementById("invoiceFile").value = "";
+                document.getElementById("invoiceXml").value = "";
+                document.getElementById("invoiceHash").value = "";
+                document.getElementById("invoiceB64").value = "";
+                document.getElementById("invoiceUuid").value = crypto.randomUUID();
+                document.getElementById("prepareStatus").innerHTML = "";
+                document.getElementById("submitStatus").innerHTML = "";
+            }
+
+            function showInspector(request, response, payload) {
+                document.getElementById("lastRequest").textContent = JSON.stringify(request, null, 2);
+                document.getElementById("lastResponse").textContent = JSON.stringify(
+                    { status: response.status, statusText: response.statusText, body: payload },
+                    null,
+                    2,
+                );
+            }
+
+            async function safeJson(response) {
+                try {
+                    return await response.json();
+                } catch (_error) {
+                    return { message: response.statusText || "Request failed" };
+                }
+            }
+
+            function setStatus(target, type, message) {
+                document.getElementById(target).innerHTML = `<div class="status ${type}">${escapeHtml(message)}</div>`;
+            }
+
+            function toCurl(request) {
+                const headers = Object.entries(request.headers)
+                    .map(([key, value]) => `  -H '${key}: ${value}' \\\n`)
+                    .join("");
+                return `curl -X ${request.method} '${request.url}' \\\n${headers}  -d '${JSON.stringify(request.body)}'`;
+            }
+
+            function urlFor(path) {
+                return field("baseUrl").replace(/\/$/, "") + path;
+            }
+
+            function field(id) {
+                return document.getElementById(id).value.trim();
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;");
+            }
+        </script>
+    </body>
+</html>

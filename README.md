@@ -42,15 +42,17 @@ src/
 |-- services/
 |   |-- crypto/                     # PKI, XAdES, QR verification
 |   |-- db/                         # Database reads/writes and chain state
-|   |-- pipeline/                   # Enrollment, onboarding, validation, clearance, reporting
+|   |-- pipeline/                   # Enrollment, token generation, validation, clearance, reporting
 |   `-- xml/                        # XML extraction, canonicalization, validation, editing
-|-- static/                         # Onboarding HTML
+|-- static/                         # Portal, sandbox, and API HTML pages
 `-- xsd/                            # Embedded UBL schemas
 ```
 
 The main request paths are:
 
-- `POST /onboard` creates a short-lived enrollment token for a registered taxpayer.
+- `GET /` serves the STC home page.
+- `GET /e-invoicing` serves the taxpayer e-invoicing portal.
+- `GET /sandbox` serves the invoice testing sandbox.
 - `POST /enroll` validates the token and CSR, issues a device certificate, and creates a device row.
 - `POST /clear` validates, stamps, signs, stores, and returns a cleared invoice.
 - `POST /report` validates and stores a reported invoice without server stamping.
@@ -149,15 +151,15 @@ The Compose setup exposes the app on `http://localhost:8080` and PostgreSQL on `
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/` | Plain text hello response. |
+| `GET` | `/` | STC home page. |
+| `GET` | `/e-invoicing` | Taxpayer portal for sign-in and enrollment token generation. |
+| `GET` | `/sandbox` | Sandbox console for enrollment and invoice testing. |
+| `GET` | `/api` | Public API reference page. |
 | `GET` | `/health_check` | Empty `200 OK` health response. |
-| `GET` | `/onboard` | HTML onboarding form. |
-| `POST` | `/onboard` | Generate a 5-minute enrollment token for a registered taxpayer. |
 | `POST` | `/enroll` | Enroll a device using a token and DER CSR. |
 | `POST` | `/clear` | Submit an invoice for clearance. |
 | `POST` | `/report` | Submit an invoice for reporting. |
 | `GET` | `/get_invoices` | Debug endpoint returning stored invoice count. |
-| `POST` | `/verify_qr` | Verify QR payload signature. |
 
 See `TECHNICAL_DOCUMENTATION.md` for exact request and response schemas.
 
@@ -165,13 +167,7 @@ See `TECHNICAL_DOCUMENTATION.md` for exact request and response schemas.
 
 Enrollment is a two-step flow.
 
-1. Generate a token for a taxpayer that exists in the `taxpayers` table.
-
-```bash
-curl -X POST http://localhost:8080/onboard \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test Company","email":"test@example.com","company_id":"100011"}'
-```
+1. Sign in at `http://localhost:8080/e-invoicing` with a taxpayer TIN and password, then generate an enrollment token. The seeded demo taxpayers use password `password`.
 
 2. Generate a CSR whose subject includes the taxpayer TIN and device UUID.
 
@@ -184,12 +180,12 @@ openssl req -new \
   | base64 -w 0 > device.csr.b64
 ```
 
-3. Enroll the device with the returned token and base64 DER CSR.
+3. Enroll the device with the generated token and base64 DER CSR.
 
 ```bash
 curl -X POST http://localhost:8080/enroll \
   -H "Content-Type: application/json" \
-  -d "{\"token\":\"TOKEN_FROM_ONBOARD\",\"csr\":\"$(tr -d '\n' < device.csr.b64)\"}"
+  -d "{\"token\":\"TOKEN_FROM_PORTAL\",\"csr\":\"$(tr -d '\n' < device.csr.b64)\"}"
 ```
 
 The issued certificate is returned as PEM text in `data.certificate`.
@@ -216,7 +212,7 @@ Sandbox mode is controlled by the `X-Sandbox-Mode` header. In sandbox mode, lock
 
 Migrations run automatically on startup from `./migrations`. The active logical tables are:
 
-- `taxpayers`: registered taxpayer TINs.
+- `taxpayers`: registered taxpayer TINs and Argon2 password hashes.
 - `devices`: enrolled device UUIDs, taxpayer ownership, current ICV, and last PIH.
 - `csr_challenges`: hashed enrollment tokens with expiry and usage state.
 - `invoices`: submitted invoice UUIDs, hashes, stored invoice payloads, device IDs, and invoice type.

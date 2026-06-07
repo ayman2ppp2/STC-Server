@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>STC E-Invoicing</title>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                font-family:
+                    Inter, "Segoe UI", Arial, sans-serif;
+                color: #142235;
+                background: #f4f7fb;
+            }
+            header {
+                background: #0b3b5b;
+                color: #ffffff;
+                padding: 18px 24px;
+            }
+            .topbar {
+                max-width: 1120px;
+                margin: 0 auto;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+            }
+            .brand {
+                font-weight: 800;
+                letter-spacing: 0.02em;
+            }
+            nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            nav a {
+                color: #ffffff;
+                text-decoration: none;
+                border: 1px solid rgba(255, 255, 255, 0.24);
+                border-radius: 999px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            main {
+                max-width: 1120px;
+                margin: 0 auto;
+                padding: 34px 24px 72px;
+            }
+            .hero {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 380px;
+                gap: 24px;
+                align-items: stretch;
+            }
+            .card {
+                background: #ffffff;
+                border: 1px solid #dde6ef;
+                border-radius: 24px;
+                box-shadow: 0 18px 48px rgba(20, 34, 53, 0.07);
+                padding: 28px;
+            }
+            h1,
+            h2,
+            h3 {
+                margin-top: 0;
+                color: #091a2b;
+            }
+            h1 {
+                font-size: clamp(34px, 5vw, 56px);
+                line-height: 1;
+                letter-spacing: -0.045em;
+                margin-bottom: 18px;
+            }
+            p {
+                color: #50677f;
+                line-height: 1.7;
+            }
+            .steps {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 14px;
+                margin-top: 22px;
+            }
+            .step {
+                border: 1px solid #dce7ef;
+                border-radius: 18px;
+                padding: 16px;
+                background: #f8fbfd;
+            }
+            .step strong {
+                display: block;
+                margin-bottom: 8px;
+                color: #0b3b5b;
+            }
+            label {
+                display: block;
+                font-size: 13px;
+                font-weight: 800;
+                color: #40576d;
+                margin-bottom: 8px;
+            }
+            input {
+                width: 100%;
+                border: 1px solid #cfdce8;
+                border-radius: 12px;
+                padding: 12px 13px;
+                font: inherit;
+                margin-bottom: 14px;
+                background: #ffffff;
+            }
+            button,
+            .button {
+                border: 0;
+                border-radius: 13px;
+                padding: 12px 16px;
+                font: inherit;
+                font-weight: 800;
+                cursor: pointer;
+                background: #0b3b5b;
+                color: #ffffff;
+                text-decoration: none;
+                display: inline-flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+            }
+            button:disabled {
+                cursor: default;
+                opacity: 0.55;
+            }
+            .secondary {
+                background: #ffffff;
+                color: #0b3b5b;
+                border: 1px solid #b9cede;
+            }
+            .hidden {
+                display: none;
+            }
+            .result {
+                margin-top: 14px;
+                border-radius: 14px;
+                padding: 13px;
+                line-height: 1.55;
+                font-size: 14px;
+            }
+            .success {
+                background: #edf8f2;
+                border: 1px solid #cdebd7;
+                color: #246340;
+            }
+            .error {
+                background: #fff1f2;
+                border: 1px solid #f2ccd2;
+                color: #9b2335;
+            }
+            .token {
+                margin-top: 10px;
+                padding: 12px;
+                border-radius: 12px;
+                background: #0f2030;
+                color: #e9f3f5;
+                font-family: "SFMono-Regular", Consolas, monospace;
+                word-break: break-all;
+            }
+            .dashboard {
+                margin-top: 24px;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 18px;
+            }
+            .row {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 12px 0;
+                border-bottom: 1px solid #edf2f6;
+            }
+            .row span {
+                color: #64758a;
+            }
+            .row strong {
+                text-align: right;
+            }
+            .actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-top: 18px;
+            }
+            .note {
+                font-size: 13px;
+                color: #6b7e92;
+                margin-bottom: 0;
+            }
+            @media (max-width: 900px) {
+                .topbar,
+                .hero,
+                .dashboard {
+                    grid-template-columns: 1fr;
+                }
+                .topbar {
+                    display: grid;
+                }
+                .steps {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="topbar">
+                <div class="brand">STC E-Invoicing</div>
+                <nav>
+                    <a href="/">Home</a>
+                    <a href="/sandbox">Sandbox</a>
+                    <a href="/api">API Reference</a>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            <section class="hero">
+                <article class="card">
+                    <h1>Electronic invoicing portal</h1>
+                    <p>
+                        STC e-invoicing lets registered taxpayers enroll devices,
+                        submit signed UBL invoices, clear taxable invoices, and
+                        report invoices through a structured API flow. The server
+                        validates schema, invoice hashes, XAdES-BES signatures,
+                        certificates, taxpayer TINs, and invoice chain state.
+                    </p>
+                    <div class="steps">
+                        <div class="step">
+                            <strong>1. Sign in</strong>
+                            Enter a registered taxpayer TIN and password.
+                        </div>
+                        <div class="step">
+                            <strong>2. Enroll device</strong>
+                            Generate a short-lived token and enroll a CSR.
+                        </div>
+                        <div class="step">
+                            <strong>3. Submit invoices</strong>
+                            Test clearance and reporting in the sandbox.
+                        </div>
+                    </div>
+                </article>
+
+                <aside class="card" id="loginCard">
+                    <h2>Taxpayer sign-in</h2>
+                    <form onsubmit="signIn(event)">
+                        <label for="tin">TIN</label>
+                        <input id="tin" name="tin" autocomplete="username" placeholder="100011" />
+
+                        <label for="password">Password</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="password" />
+
+                        <button id="signInBtn" type="submit">Sign in</button>
+                    </form>
+                    <p class="note">Demo taxpayers use password: password</p>
+                    <div id="loginResult"></div>
+                </aside>
+            </section>
+
+            <section id="dashboard" class="dashboard hidden">
+                <article class="card">
+                    <h2>Taxpayer workspace</h2>
+                    <div class="row"><span>TIN</span><strong id="taxpayerTin"></strong></div>
+                    <div class="row"><span>Name</span><strong id="taxpayerName"></strong></div>
+                    <div class="row"><span>Status</span><strong>Registered</strong></div>
+                    <div class="actions">
+                        <button id="tokenBtn" onclick="generateToken()">Generate enrollment token</button>
+                        <button class="secondary" onclick="signOut()">Sign out</button>
+                    </div>
+                    <div id="tokenResult"></div>
+                </article>
+
+                <article class="card">
+                    <h2>Next steps</h2>
+                    <p>
+                        Use the sandbox to generate a CSR command, enroll your
+                        device with the token, and submit signed clearance or
+                        reporting invoices with sandbox mode enabled.
+                    </p>
+                    <div class="actions">
+                        <a class="button" href="/sandbox">Open sandbox</a>
+                        <a class="button secondary" href="/api">View APIs</a>
+                    </div>
+                </article>
+            </section>
+        </main>
+
+        <script>
+            const session = { tin: "", password: "", name: "" };
+
+            async function signIn(event) {
+                event.preventDefault();
+                const tin = document.getElementById("tin").value.trim();
+                const password = document.getElementById("password").value;
+                if (!tin || !password) {
+                    show("loginResult", "error", "TIN and password are required.");
+                    return;
+                }
+
+                const button = document.getElementById("signInBtn");
+                button.disabled = true;
+                button.textContent = "Signing in...";
+
+                try {
+                    const response = await fetch("/e-invoicing/signin", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ tin, password }),
+                    });
+                    const payload = await safeJson(response);
+                    if (!response.ok) {
+                        show("loginResult", "error", payload.message || "Sign-in failed.");
+                        return;
+                    }
+
+                    session.tin = payload.data.tin;
+                    session.name = payload.data.name;
+                    session.password = password;
+                    document.getElementById("taxpayerTin").textContent = session.tin;
+                    document.getElementById("taxpayerName").textContent = session.name;
+                    document.getElementById("loginCard").classList.add("hidden");
+                    document.getElementById("dashboard").classList.remove("hidden");
+                    show("tokenResult", "success", "Signed in. You can now generate an enrollment token.");
+                } catch (error) {
+                    show("loginResult", "error", "Network error: " + error.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Sign in";
+                }
+            }
+
+            async function generateToken() {
+                if (!session.tin || !session.password) {
+                    show("tokenResult", "error", "Sign in first.");
+                    return;
+                }
+
+                const button = document.getElementById("tokenBtn");
+                button.disabled = true;
+                button.textContent = "Generating...";
+
+                try {
+                    const response = await fetch("/e-invoicing/token", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ tin: session.tin, password: session.password }),
+                    });
+                    const payload = await safeJson(response);
+                    if (!response.ok) {
+                        show("tokenResult", "error", payload.message || "Token generation failed.");
+                        return;
+                    }
+
+                    const token = payload.data.token;
+                    show(
+                        "tokenResult",
+                        "success",
+                        `${payload.message}<div class="token">${escapeHtml(token)}</div><div class="actions"><button class="secondary" onclick="copyText('${escapeJs(token)}')">Copy token</button><a class="button" href="/sandbox">Use in sandbox</a></div>`,
+                    );
+                } catch (error) {
+                    show("tokenResult", "error", "Network error: " + error.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Generate enrollment token";
+                }
+            }
+
+            function signOut() {
+                session.tin = "";
+                session.name = "";
+                session.password = "";
+                document.getElementById("password").value = "";
+                document.getElementById("dashboard").classList.add("hidden");
+                document.getElementById("loginCard").classList.remove("hidden");
+                document.getElementById("loginResult").innerHTML = "";
+                document.getElementById("tokenResult").innerHTML = "";
+            }
+
+            async function safeJson(response) {
+                try {
+                    return await response.json();
+                } catch (_error) {
+                    return { message: response.statusText || "Request failed" };
+                }
+            }
+
+            function show(target, type, message) {
+                document.getElementById(target).innerHTML = `<div class="result ${type}">${message}</div>`;
+            }
+
+            function copyText(value) {
+                navigator.clipboard.writeText(value);
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;");
+            }
+
+            function escapeJs(value) {
+                return String(value).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+            }
+        </script>
+    </body>
+</html>

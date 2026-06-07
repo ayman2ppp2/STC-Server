@@ -84,15 +84,6 @@ Most API responses use this generic shape:
 }
 ```
 
-`POST /onboard` is an exception. It returns a plain onboarding response:
-
-```json
-{
-  "message": "Token generated successfully. Use this token within 5 minutes.",
-  "token": "100011:550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
 Errors return `success: false` through `ApiResponse<T>` with a sanitized message and stable error code. Detailed implementation errors are logged server-side and are not exposed to clients.
 
 ```json
@@ -111,13 +102,26 @@ Errors return `success: false` through `ApiResponse<T>` with a sanitized message
 
 ### GET `/`
 
-Returns a plain text greeting.
+Serves the STC home page with navigation to the e-invoicing portal.
 
 Success response:
 
-```text
-Hello from STC Actix server!
+```http
+200 OK
+Content-Type: text/html; charset=utf-8
 ```
+
+### GET `/e-invoicing`
+
+Serves the taxpayer portal for TIN/password sign-in, e-invoicing description, enrollment token generation, and navigation to the sandbox and API reference.
+
+### GET `/sandbox`
+
+Serves the sandbox console for CSR command generation, device enrollment, canonical invoice payload preparation, and sandbox clearance/reporting requests.
+
+### GET `/api`
+
+Serves the public API reference page for `/enroll`, `/clear`, `/report`, and `/health_check`.
 
 ### GET `/health_check`
 
@@ -130,56 +134,6 @@ Success response:
 ```
 
 The response body is empty.
-
-### GET `/onboard`
-
-Serves the static HTML onboarding form from `src/static/token_form.html`.
-
-Success response:
-
-```http
-200 OK
-Content-Type: text/html
-```
-
-### POST `/onboard`
-
-Generates a 5-minute enrollment token for a taxpayer TIN that exists in `taxpayers`.
-
-Request body:
-
-```json
-{
-  "name": "Test Company",
-  "email": "test@example.com",
-  "company_id": "100011"
-}
-```
-
-Current implementation only uses `company_id`. `name` and `email` are accepted by the DTO but are not persisted or validated by the route.
-
-Success response:
-
-```json
-{
-  "message": "Token generated successfully. Use this token within 5 minutes.",
-  "token": "100011:550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-Invalid TIN response:
-
-```json
-{
-  "success": false,
-  "message": "Company ID is not registered",
-  "data": {
-    "error": {
-      "code": "company_id_not_registered"
-    }
-  }
-}
-```
 
 ### POST `/enroll`
 
@@ -429,53 +383,17 @@ Failure response:
 }
 ```
 
-### POST `/verify_qr`
-
-Verifies the signature embedded in a QR payload.
-
-Request body:
-
-```json
-{
-  "qr_b64": "BASE64_QR_PAYLOAD"
-}
-```
-
-Success response:
-
-```json
-{
-  "success": true,
-  "message": "verified",
-  "data": null
-}
-```
-
-Failure response:
-
-```json
-{
-  "success": false,
-  "message": "QR verification failed",
-  "data": {
-    "error": {
-      "code": "qr_verification_failed"
-    }
-  }
-}
-```
-
 ## Enrollment Flow
 
 ### Token Generation
 
-`POST /onboard` checks that `company_id` exists in `taxpayers`. It generates a token in this format:
+The e-invoicing portal authenticates a taxpayer by TIN and password before generating a device enrollment token. It generates a token in this format:
 
 ```text
 {tin}:{uuid}
 ```
 
-The service stores only `SHA256(token)` in `csr_challenges.token_hash`. The token expires after 5 minutes and can be used once.
+The service stores only `SHA256(token)` in `csr_challenges.token_hash`. The token expires after 5 minutes and can be used once. Taxpayer passwords are stored as Argon2 hashes in `taxpayers.password_hash`.
 
 Expired unused tokens are cleaned by a background task every hour.
 
@@ -622,16 +540,17 @@ CREATE TABLE taxpayers (
     tin VARCHAR(10) PRIMARY KEY,
     name TEXT NOT NULL,
     address TEXT,
+    password_hash TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
 Seed taxpayers:
 
-| TIN | Name |
-|-----|------|
-| `100011` | `Test Supplier Company` |
-| `100021` | `Test Customer Company` |
+| TIN | Name | Demo password |
+|-----|------|---------------|
+| `100011` | `Test Supplier Company` | `password` |
+| `100021` | `Test Customer Company` | `password` |
 
 ### `devices`
 
@@ -708,7 +627,7 @@ This prevents concurrent submissions for the same device from racing the ICV/PIH
 - The JSON request limit is `256 KiB`; larger invoices will be rejected by Actix before route logic runs.
 - `GET /get_invoices` is a debug helper and should not be exposed in a production deployment.
 - Error responses expose sanitized messages and stable error codes; detailed implementation errors remain in server logs.
-- The onboarding HTML includes fields beyond what the JSON route currently uses.
+- The e-invoicing portal keeps the taxpayer password only in browser memory for the current session and resends it when generating an enrollment token.
 - The repository integration shell scripts are useful development helpers but are not the source of truth for endpoint contracts.
 
 ## Examples
@@ -736,11 +655,7 @@ curl -i http://localhost:8080/health_check
 
 ### Generate Enrollment Token
 
-```bash
-curl -X POST http://localhost:8080/onboard \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test Company","email":"test@example.com","company_id":"100011"}'
-```
+Open `http://localhost:8080/e-invoicing`, sign in with TIN `100011` and password `password`, then click `Generate enrollment token`.
 
 ### Generate CSR
 
@@ -788,12 +703,4 @@ curl -X POST http://localhost:8080/report \
     "invoice_hash": "BASE64_SHA256_HASH",
     "invoice": "BASE64_UBL_INVOICE_XML"
   }'
-```
-
-### Verify QR Payload
-
-```bash
-curl -X POST http://localhost:8080/verify_qr \
-  -H "Content-Type: application/json" \
-  -d '{"qr_b64":"BASE64_QR_PAYLOAD"}'
 ```
