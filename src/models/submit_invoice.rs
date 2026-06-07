@@ -8,17 +8,27 @@ use openssl::x509::X509;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use tracing::instrument;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::models::device::Device;
 use crate::services::db::device_service::get_device;
 use crate::services::xml::c14n11::canonicalize_c14n11;
 use crate::services::xml::extractors::{extract_crt, extract_invoice, extract_supplier_id};
-#[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
+#[derive(Debug, Clone, Deserialize, Serialize, FromRow, ToSchema)]
 pub struct SubmitInvoiceDto {
+    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
     pub uuid: String,
+    #[schema(example = "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE")]
     pub invoice_hash: String,
+    #[schema(example = "BASE64_UBL_INVOICE_XML")]
     pub invoice: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ClearedInvoiceDto {
+    #[schema(example = "BASE64_CLEARED_INVOICE_XML")]
+    pub cleared_invoice: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]

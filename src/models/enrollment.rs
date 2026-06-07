@@ -1,11 +1,21 @@
 use anyhow::{Context, anyhow};
 use base64::{Engine, engine::general_purpose};
 use openssl::{nid::Nid, x509::X509Req};
+use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct EnrollDTO {
+    #[schema(example = "100011:550e8400-e29b-41d4-a716-446655440000")]
     pub token: String,
+    #[schema(example = "BASE64_DER_CSR")]
     pub csr: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct EnrollmentCertificateDto {
+    #[schema(example = "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n")]
+    pub certificate: String,
 }
 
 // #[derive(serde::Serialize)]

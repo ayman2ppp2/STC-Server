@@ -7,6 +7,8 @@ edition = "2024"
 
 [dependencies]
 actix-web = "4.13.0"
+utoipa = { version = "5.5.0", features = ["actix_extras"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 tokio = { version = "1.51.0", features = ["full"] }
 serde = { version = "1.0.228", features = ["derive"]}
 quick-xml = { version = "0.39.2", features = ["serialize"] }
@@ -30,3 +32,4 @@ tracing-attributes = "0.1"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 fastxml ="0.8.1"
 argon2 = "0.5"
+actix-session = { version = "0.10", features = ["cookie-session"] }

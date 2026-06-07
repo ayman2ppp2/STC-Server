@@ -121,7 +121,11 @@ Serves the sandbox console for CSR command generation, device enrollment, canoni
 
 ### GET `/api`
 
-Serves the public API reference page for `/prod/enrollment/enroll`, `/prod/invoices/clear`, `/sandbox/invoices/clear`, `/prod/invoices/report`, `/sandbox/invoices/report`, and `/health_check`.
+Redirects to the Swagger UI at `/api/` for public integration API documentation. The Swagger document includes only `/prod/enrollment/enroll`, `/prod/invoices/clear`, `/sandbox/invoices/clear`, `/prod/invoices/report`, `/sandbox/invoices/report`, and `/health_check`.
+
+### GET `/api/openapi.json`
+
+Serves the generated OpenAPI JSON specification consumed by Swagger UI.
 
 ### GET `/health_check`
 
@@ -363,9 +367,7 @@ Success response:
 {
   "success": true,
   "message": "Invoice reported",
-  "data": {
-    "submitted": true
-  }
+  "data": null
 }
 ```
 
@@ -423,9 +425,7 @@ Success response:
 {
   "success": true,
   "message": "Invoice reported",
-  "data": {
-    "submitted": true
-  }
+  "data": null
 }
 ```
 
