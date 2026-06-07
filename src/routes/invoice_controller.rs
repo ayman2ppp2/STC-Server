@@ -1,7 +1,6 @@
 use actix_web::{HttpResponse, web};
 use base64::{Engine, engine::general_purpose};
 use fastxml::schema::CompiledSchema;
-use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -9,8 +8,8 @@ use crate::{
     config::crypto_config::Crypto,
     errors::{ApiError, ErrorCode},
     models::{
-        responses::ApiResponse,
-        submit_invoice::{InvoiceType, SubmitInvoiceDto},
+        responses::{ApiResponse, EmptyApiResponse, ErrorData},
+        submit_invoice::{ClearedInvoiceDto, InvoiceType, SubmitInvoiceDto},
     },
     services::{
         db::rejected_invoice_service::{RejectedInvoiceRecord, save_rejected_invoice},
@@ -20,6 +19,22 @@ use crate::{
     },
 };
 
+#[utoipa::path(
+    post,
+    path = "/prod/invoices/clear",
+    tag = "Public API",
+    request_body = SubmitInvoiceDto,
+    responses(
+        (status = 200, description = "Invoice cleared", body = ApiResponse<ClearedInvoiceDto>),
+        (status = 400, description = "Invalid invoice request or validation failure", body = ApiResponse<ErrorData>),
+        (status = 403, description = "Device is inactive", body = ApiResponse<ErrorData>),
+        (status = 404, description = "Device or taxpayer was not found", body = ApiResponse<ErrorData>),
+        (status = 409, description = "Duplicate invoice or chain conflict", body = ApiResponse<ErrorData>),
+        (status = 413, description = "Request body is too large", body = ApiResponse<ErrorData>),
+        (status = 415, description = "Content-Type must be application/json", body = ApiResponse<ErrorData>),
+        (status = 500, description = "Internal server error", body = ApiResponse<ErrorData>)
+    )
+)]
 pub async fn clearance_prod(
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
@@ -29,6 +44,22 @@ pub async fn clearance_prod(
     handle_clearance(db_pool, invoice_dto, crypto, schema_validator, false).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/sandbox/invoices/clear",
+    tag = "Public API",
+    request_body = SubmitInvoiceDto,
+    responses(
+        (status = 200, description = "Invoice cleared without persistence", body = ApiResponse<ClearedInvoiceDto>),
+        (status = 400, description = "Invalid invoice request or validation failure", body = ApiResponse<ErrorData>),
+        (status = 403, description = "Device is inactive", body = ApiResponse<ErrorData>),
+        (status = 404, description = "Device or taxpayer was not found", body = ApiResponse<ErrorData>),
+        (status = 409, description = "Invoice chain conflict", body = ApiResponse<ErrorData>),
+        (status = 413, description = "Request body is too large", body = ApiResponse<ErrorData>),
+        (status = 415, description = "Content-Type must be application/json", body = ApiResponse<ErrorData>),
+        (status = 500, description = "Internal server error", body = ApiResponse<ErrorData>)
+    )
+)]
 pub async fn clearance_sandbox(
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
@@ -130,10 +161,26 @@ async fn handle_clearance(
     Ok(HttpResponse::Ok().json(ApiResponse {
         success: true,
         message: "Invoice cleared".into(),
-        data: Some(json!({"cleared_invoice": cleared_invoice})),
+        data: Some(ClearedInvoiceDto { cleared_invoice }),
     }))
 }
 
+#[utoipa::path(
+    post,
+    path = "/prod/invoices/report",
+    tag = "Public API",
+    request_body = SubmitInvoiceDto,
+    responses(
+        (status = 202, description = "Invoice reported", body = EmptyApiResponse),
+        (status = 400, description = "Invalid invoice request or validation failure", body = ApiResponse<ErrorData>),
+        (status = 403, description = "Device is inactive", body = ApiResponse<ErrorData>),
+        (status = 404, description = "Device or taxpayer was not found", body = ApiResponse<ErrorData>),
+        (status = 409, description = "Duplicate invoice or chain conflict", body = ApiResponse<ErrorData>),
+        (status = 413, description = "Request body is too large", body = ApiResponse<ErrorData>),
+        (status = 415, description = "Content-Type must be application/json", body = ApiResponse<ErrorData>),
+        (status = 500, description = "Internal server error", body = ApiResponse<ErrorData>)
+    )
+)]
 pub async fn reporting_prod(
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,
@@ -143,6 +190,22 @@ pub async fn reporting_prod(
     handle_reporting(db_pool, invoice_dto, crypto, schema_validator, false).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/sandbox/invoices/report",
+    tag = "Public API",
+    request_body = SubmitInvoiceDto,
+    responses(
+        (status = 202, description = "Invoice reported without persistence", body = EmptyApiResponse),
+        (status = 400, description = "Invalid invoice request or validation failure", body = ApiResponse<ErrorData>),
+        (status = 403, description = "Device is inactive", body = ApiResponse<ErrorData>),
+        (status = 404, description = "Device or taxpayer was not found", body = ApiResponse<ErrorData>),
+        (status = 409, description = "Invoice chain conflict", body = ApiResponse<ErrorData>),
+        (status = 413, description = "Request body is too large", body = ApiResponse<ErrorData>),
+        (status = 415, description = "Content-Type must be application/json", body = ApiResponse<ErrorData>),
+        (status = 500, description = "Internal server error", body = ApiResponse<ErrorData>)
+    )
+)]
 pub async fn reporting_sandbox(
     db_pool: web::Data<PgPool>,
     invoice_dto: web::Json<SubmitInvoiceDto>,

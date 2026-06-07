@@ -44,7 +44,7 @@ src/
 |   |-- db/                         # Database reads/writes and chain state
 |   |-- pipeline/                   # Enrollment, token generation, validation, clearance, reporting
 |   `-- xml/                        # XML extraction, canonicalization, validation, editing
-|-- static/                         # Portal, sandbox, and API HTML pages
+|-- static/                         # Portal and sandbox HTML pages
 `-- xsd/                            # Embedded UBL schemas
 ```
 
@@ -156,7 +156,8 @@ The Compose setup exposes the app on `http://localhost:8080` and PostgreSQL on `
 | `GET` | `/` | STC home page. |
 | `GET` | `/e-invoicing` | Taxpayer portal for sign-in, token generation, and production invoice reports. |
 | `GET` | `/sandbox` | Sandbox console for enrollment and invoice testing. |
-| `GET` | `/api` | Public API reference page. |
+| `GET` | `/api` | Swagger UI for the public API endpoints. |
+| `GET` | `/api/openapi.json` | Generated OpenAPI JSON specification. |
 | `GET` | `/health_check` | Empty `200 OK` health response. |
 | `POST` | `/prod/enrollment/enroll` | Enroll a production device using a token and DER CSR. |
 | `POST` | `/prod/invoices/clear` | Submit a production invoice for clearance. |
@@ -164,7 +165,7 @@ The Compose setup exposes the app on `http://localhost:8080` and PostgreSQL on `
 | `POST` | `/sandbox/invoices/clear` | Validate a clearance invoice without persistence. |
 | `POST` | `/sandbox/invoices/report` | Validate a reporting invoice without persistence. |
 
-See `TECHNICAL_DOCUMENTATION.md` for exact request and response schemas.
+See Swagger UI at `/api` or `TECHNICAL_DOCUMENTATION.md` for request and response details.
 
 ## Device Enrollment
 

@@ -703,9 +703,13 @@ mod tests {
         let certificate_b64 = extract_crt(&xml).unwrap();
         let certificate_der = general_purpose::STANDARD.decode(certificate_b64).unwrap();
         let certificate = X509::from_der(&certificate_der).unwrap();
-        let err = validate_xades_bes_signature(&xml, &invoice_hash, &certificate)
-            .unwrap_err()
-            .to_string();
+        let tampered_xml = String::from_utf8(xml)
+            .unwrap()
+            .replacen("XmYUmlqH", "AmYUmlqH", 1);
+        let err =
+            validate_xades_bes_signature(tampered_xml.as_bytes(), &invoice_hash, &certificate)
+                .unwrap_err()
+                .to_string();
         assert!(err.contains("Invalid invoice signature"));
     }
 

@@ -1,9 +1,10 @@
 use actix_session::{SessionMiddleware, storage::CookieSessionStore};
 use actix_web::cookie::Key;
-use actix_web::{App, HttpMessage, HttpServer, dev::Service, http::header, web};
+use actix_web::{App, HttpMessage, HttpResponse, HttpServer, dev::Service, http::header, web};
 use stc_server::{
     config::crypto_config::Crypto,
     config::{db_config, xsd_config::schema_validator_from_temp},
+    docs::ApiDoc,
     errors::json_error_handler,
     routes::{
         enroll::enroll,
@@ -11,7 +12,7 @@ use stc_server::{
         invoice_controller::{
             clearance_prod, clearance_sandbox, reporting_prod, reporting_sandbox,
         },
-        pages::{api_page, e_invoicing_page, home, login_page, sandbox_page},
+        pages::{e_invoicing_page, home, login_page, sandbox_page},
         taxpayer_portal::{
             generate_enrollment_token, invoice_report, prepare_invoice_payload, sign_in, sign_out,
             taxpayer_me,
@@ -23,6 +24,8 @@ use stc_server::{
 use tracing_actix_web::{RequestId, TracingLogger};
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -133,7 +136,15 @@ async fn main() -> std::io::Result<()> {
                 "/sandbox/invoice-payload",
                 web::post().to(prepare_invoice_payload),
             )
-            .route("/api", web::get().to(api_page))
+            .route(
+                "/api",
+                web::get().to(|| async {
+                    HttpResponse::Found()
+                        .append_header(("Location", "/api/"))
+                        .finish()
+                }),
+            )
+            .service(SwaggerUi::new("/api/{_:.*}").url("/api/openapi.json", ApiDoc::openapi()))
             .route("/health_check", web::get().to(health_check))
             .service(
                 web::scope("/prod")

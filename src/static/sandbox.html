@@ -228,6 +228,12 @@
                         Run this locally to generate a private key and a base64
                         DER CSR. Keep the private key with your test device.
                     </p>
+                    <label for="csrOs">Operating system</label>
+                    <select id="csrOs" onchange="refreshCsrCommand()">
+                        <option value="linux">Linux</option>
+                        <option value="macos">macOS</option>
+                        <option value="windows">Windows PowerShell</option>
+                    </select>
                     <div id="csrCommand" class="code"></div>
                     <div class="actions">
                         <button onclick="refreshCsrCommand()">Refresh command</button>
@@ -312,10 +318,19 @@
 
             document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("baseUrl").value = window.location.origin;
+                initializeCsrOs();
                 generateDeviceUuid();
                 document.getElementById("invoiceUuid").value = crypto.randomUUID();
                 refreshCsrCommand();
             });
+
+            function initializeCsrOs() {
+                const platform = `${navigator.platform || ""} ${navigator.userAgent || ""}`.toLowerCase();
+                let os = "linux";
+                if (platform.includes("mac")) os = "macos";
+                if (platform.includes("win")) os = "windows";
+                document.getElementById("csrOs").value = os;
+            }
 
             function generateDeviceUuid() {
                 document.getElementById("deviceUuid").value = crypto.randomUUID();
@@ -325,12 +340,20 @@
             function refreshCsrCommand() {
                 const tin = field("tin") || "100011";
                 const deviceUuid = field("deviceUuid") || "replace-device-uuid";
-                const command = `openssl genrsa -out device.key 2048
-openssl req -new \\
-  -key device.key \\
-  -outform DER \\
-  -subj "/O=${tin}/serialNumber=${deviceUuid}" \\
-  | base64 -w 0 > device.csr.b64`;
+                const os = field("csrOs") || "linux";
+                const subject = `/O=${tin}/serialNumber=${deviceUuid}`;
+                const commands = {
+                    linux: `openssl genrsa -out device.key 2048
+openssl req -new -key device.key -outform DER -out device.csr.der -subj "${subject}"
+base64 -w 0 device.csr.der > device.csr.b64`,
+                    macos: `openssl genrsa -out device.key 2048
+openssl req -new -key device.key -outform DER -out device.csr.der -subj "${subject}"
+base64 < device.csr.der | tr -d '\n' > device.csr.b64`,
+                    windows: `openssl genrsa -out device.key 2048
+openssl req -new -key device.key -outform DER -out device.csr.der -subj "${subject}"
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("device.csr.der")) | Set-Content -NoNewline device.csr.b64`,
+                };
+                const command = commands[os] || commands.linux;
                 document.getElementById("csrCommand").textContent = command;
             }
 
