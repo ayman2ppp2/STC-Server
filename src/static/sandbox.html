@@ -237,7 +237,7 @@
                     <h1>Sandbox developer console</h1>
                     <p>
                         Use this console to test the STC e-invoicing integration
-                        flow with sandbox mode enabled. It helps prepare device
+                        flow through the sandbox invoice endpoints. It helps prepare device
                         enrollment, submit signed UBL invoices for clearance or
                         reporting, inspect responses, and copy matching curl
                         commands.
@@ -359,7 +359,7 @@
                     </div>
 
                     <div class="actions">
-                        <button id="submitInvoiceBtn" onclick="submitInvoice()">Submit with sandbox mode</button>
+                        <button id="submitInvoiceBtn" onclick="submitInvoice()">Submit to sandbox endpoint</button>
                         <button class="secondary" onclick="copyCurl('invoice')">Copy invoice curl</button>
                     </div>
 
@@ -418,7 +418,7 @@ openssl req -new \\
 
                 const request = {
                     method: "POST",
-                    url: urlFor("/enroll"),
+                    url: urlFor("/prod/enrollment/enroll"),
                     headers: { "Content-Type": "application/json" },
                     body: { token, csr },
                 };
@@ -516,11 +516,8 @@ openssl req -new \\
 
                 const request = {
                     method: "POST",
-                    url: urlFor("/" + endpoint),
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Sandbox-Mode": "true",
-                    },
+                    url: urlFor("/sandbox/invoices/" + endpoint),
+                    headers: { "Content-Type": "application/json" },
                     body,
                 };
                 state.last.invoice = request;
@@ -537,12 +534,12 @@ openssl req -new \\
                         setStatus("submitStatus", "error", payload.message || "Sandbox submission failed.");
                         return;
                     }
-                    setStatus("submitStatus", "success", endpoint === "clear" ? "Invoice cleared in sandbox mode." : "Invoice reported in sandbox mode.");
+                    setStatus("submitStatus", "success", endpoint === "clear" ? "Invoice cleared through the sandbox endpoint." : "Invoice reported through the sandbox endpoint.");
                 } catch (error) {
                     setStatus("submitStatus", "error", "Network error: " + error.message);
                 } finally {
                     button.disabled = false;
-                    button.textContent = "Submit with sandbox mode";
+                    button.textContent = "Submit to sandbox endpoint";
                 }
             }
 
@@ -550,11 +547,8 @@ openssl req -new \\
                 const endpoint = field("invoiceEndpoint") || "clear";
                 state.last.invoice = {
                     method: "POST",
-                    url: urlFor("/" + endpoint),
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Sandbox-Mode": "true",
-                    },
+                    url: urlFor("/sandbox/invoices/" + endpoint),
+                    headers: { "Content-Type": "application/json" },
                     body: {
                         uuid: field("invoiceUuid"),
                         invoice_hash: field("invoiceHash"),

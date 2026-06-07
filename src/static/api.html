@@ -87,6 +87,15 @@
                 font-size: 12px;
                 letter-spacing: 0.08em;
             }
+            .base-url {
+                display: inline-block;
+                margin: 10px 0 0;
+                padding: 10px 12px;
+                border-radius: 12px;
+                background: #edf5ff;
+                color: #244b73;
+                font-weight: 800;
+            }
             code,
             pre {
                 font-family: "SFMono-Regular", Consolas, monospace;
@@ -146,6 +155,7 @@
                     checks. Generate taxpayer enrollment tokens from the
                     e-invoicing portal before calling enrollment.
                 </p>
+                <p class="base-url">Base URL: <code>https://stc-server.onrender.com</code></p>
                 <table>
                     <thead>
                         <tr>
@@ -155,16 +165,18 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td>POST</td><td><code>/enroll</code></td><td>Enroll a device CSR using a short-lived taxpayer token.</td></tr>
-                        <tr><td>POST</td><td><code>/clear</code></td><td>Submit a clearance invoice and receive a cleared invoice payload.</td></tr>
-                        <tr><td>POST</td><td><code>/report</code></td><td>Submit a reporting invoice and receive an acknowledgement.</td></tr>
+                        <tr><td>POST</td><td><code>/prod/enrollment/enroll</code></td><td>Enroll a production device CSR using a short-lived taxpayer token.</td></tr>
+                        <tr><td>POST</td><td><code>/prod/invoices/clear</code></td><td>Submit a production clearance invoice and receive a cleared invoice payload.</td></tr>
+                        <tr><td>POST</td><td><code>/prod/invoices/report</code></td><td>Submit a production reporting invoice and receive an acknowledgement.</td></tr>
+                        <tr><td>POST</td><td><code>/sandbox/invoices/clear</code></td><td>Validate a clearance invoice without persistence or chain-state mutation.</td></tr>
+                        <tr><td>POST</td><td><code>/sandbox/invoices/report</code></td><td>Validate a reporting invoice without persistence or chain-state mutation.</td></tr>
                         <tr><td>GET</td><td><code>/health_check</code></td><td>Return HTTP 200 when the service is reachable.</td></tr>
                     </tbody>
                 </table>
             </section>
 
             <section class="endpoint">
-                <h2><span class="method">POST</span><code>/enroll</code></h2>
+                <h2><span class="method">POST</span><code>/prod/enrollment/enroll</code></h2>
                 <p>
                     Validates a token and DER CSR, issues an STC-signed device
                     certificate, and records the device. The CSR subject must use
@@ -172,6 +184,7 @@
                     for device UUID.
                 </p>
                 <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/prod/enrollment/enroll</pre>
                 <pre>{
   "token": "100011:550e8400-e29b-41d4-a716-446655440000",
   "csr": "BASE64_DER_CSR"
@@ -187,14 +200,16 @@
             </section>
 
             <section class="endpoint">
-                <h2><span class="method">POST</span><code>/clear</code></h2>
+                <h2><span class="method">POST</span><code>/prod/invoices/clear</code></h2>
                 <p>
                     Validates a signed clearance invoice, updates signing
                     metadata, stamps the invoice, stores chain state in normal
-                    mode, and returns the cleared invoice. Add
-                    <code>X-Sandbox-Mode: true</code> for sandbox validation.
+                    mode, and returns the cleared invoice. Production failures
+                    that reach invoice handling are stored with their public API
+                    error message.
                 </p>
                 <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/prod/invoices/clear</pre>
                 <pre>{
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
@@ -211,13 +226,14 @@
             </section>
 
             <section class="endpoint">
-                <h2><span class="method">POST</span><code>/report</code></h2>
+                <h2><span class="method">POST</span><code>/prod/invoices/report</code></h2>
                 <p>
-                    Validates and acknowledges a reporting invoice. Add
-                    <code>X-Sandbox-Mode: true</code> for sandbox validation
-                    without persistence or chain-state mutation.
+                    Validates, stores, and acknowledges a production reporting
+                    invoice. Production failures that reach invoice handling are
+                    stored with their public API error message.
                 </p>
                 <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/prod/invoices/report</pre>
                 <pre>{
   "uuid": "550e8400-e29b-41d4-a716-446655440000",
   "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
@@ -232,9 +248,41 @@
             </section>
 
             <section class="endpoint">
+                <h2><span class="method">POST</span><code>/sandbox/invoices/clear</code></h2>
+                <p>
+                    Validates a signed clearance invoice through the sandbox
+                    pipeline. Sandbox submissions are never persisted, successful
+                    or failed, and do not mutate ICV/PIH chain state.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/sandbox/invoices/clear</pre>
+                <pre>{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}</pre>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">POST</span><code>/sandbox/invoices/report</code></h2>
+                <p>
+                    Validates a signed reporting invoice through the sandbox
+                    pipeline. Sandbox submissions are never persisted, successful
+                    or failed, and do not mutate ICV/PIH chain state.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/sandbox/invoices/report</pre>
+                <pre>{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}</pre>
+            </section>
+
+            <section class="endpoint">
                 <h2><span class="method">GET</span><code>/health_check</code></h2>
                 <p>Returns an empty HTTP 200 response when the service is running.</p>
-                <pre>curl http://localhost:8080/health_check</pre>
+                <pre>curl https://stc-server.onrender.com/health_check</pre>
             </section>
         </main>
     </body>

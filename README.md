@@ -28,7 +28,7 @@ This repository is a prototype. Do not use it in production without a security r
 - Maintains per-device invoice chain state with ICV and PIH values.
 - Supports clearance mode, where the server stamps/signs the invoice and injects QR data.
 - Supports reporting mode, where the server validates and stores the submitted invoice without stamping it.
-- Stores taxpayers, devices, enrollment challenges, and invoices in PostgreSQL.
+- Stores taxpayers, devices, enrollment challenges, successful invoices, and rejected production invoices in PostgreSQL.
 - Emits JSON tracing logs through `tracing` and `tracing-actix-web`.
 
 ## Architecture
@@ -53,9 +53,11 @@ The main request paths are:
 - `GET /` serves the STC home page.
 - `GET /e-invoicing` serves the taxpayer e-invoicing portal.
 - `GET /sandbox` serves the invoice testing sandbox.
-- `POST /enroll` validates the token and CSR, issues a device certificate, and creates a device row.
-- `POST /clear` validates, stamps, signs, stores, and returns a cleared invoice.
-- `POST /report` validates and stores a reported invoice without server stamping.
+- `POST /prod/enrollment/enroll` validates the token and CSR, issues a device certificate, and creates a device row.
+- `POST /prod/invoices/clear` validates, stamps, signs, stores, and returns a cleared invoice.
+- `POST /prod/invoices/report` validates and stores a reported invoice without server stamping.
+- `POST /sandbox/invoices/clear` validates a clearance invoice without persistence.
+- `POST /sandbox/invoices/report` validates a reporting invoice without persistence.
 
 ## Prerequisites
 
@@ -152,14 +154,15 @@ The Compose setup exposes the app on `http://localhost:8080` and PostgreSQL on `
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/` | STC home page. |
-| `GET` | `/e-invoicing` | Taxpayer portal for sign-in and enrollment token generation. |
+| `GET` | `/e-invoicing` | Taxpayer portal for sign-in, token generation, and production invoice reports. |
 | `GET` | `/sandbox` | Sandbox console for enrollment and invoice testing. |
 | `GET` | `/api` | Public API reference page. |
 | `GET` | `/health_check` | Empty `200 OK` health response. |
-| `POST` | `/enroll` | Enroll a device using a token and DER CSR. |
-| `POST` | `/clear` | Submit an invoice for clearance. |
-| `POST` | `/report` | Submit an invoice for reporting. |
-| `GET` | `/get_invoices` | Debug endpoint returning stored invoice count. |
+| `POST` | `/prod/enrollment/enroll` | Enroll a production device using a token and DER CSR. |
+| `POST` | `/prod/invoices/clear` | Submit a production invoice for clearance. |
+| `POST` | `/prod/invoices/report` | Submit a production invoice for reporting. |
+| `POST` | `/sandbox/invoices/clear` | Validate a clearance invoice without persistence. |
+| `POST` | `/sandbox/invoices/report` | Validate a reporting invoice without persistence. |
 
 See `TECHNICAL_DOCUMENTATION.md` for exact request and response schemas.
 
@@ -183,7 +186,7 @@ openssl req -new \
 3. Enroll the device with the generated token and base64 DER CSR.
 
 ```bash
-curl -X POST http://localhost:8080/enroll \
+curl -X POST http://localhost:8080/prod/enrollment/enroll \
   -H "Content-Type: application/json" \
   -d "{\"token\":\"TOKEN_FROM_PORTAL\",\"csr\":\"$(tr -d '\n' < device.csr.b64)\"}"
 ```
@@ -202,11 +205,13 @@ Invoice submissions use this JSON shape:
 }
 ```
 
-Clearance mode uses `POST /clear` and expects a clearance invoice profile. The server validates the invoice, updates signing metadata, signs the invoice, inserts QR data, stores the cleared invoice, and returns the base64 cleared invoice.
+Clearance mode uses `POST /prod/invoices/clear` and expects a clearance invoice profile. The server validates the invoice, updates signing metadata, signs the invoice, inserts QR data, stores the cleared invoice, and returns the base64 cleared invoice.
 
-Reporting mode uses `POST /report` and expects a reporting invoice profile. The server validates the invoice, stores the submitted invoice, and returns an acknowledgement without stamping/signing it.
+Reporting mode uses `POST /prod/invoices/report` and expects a reporting invoice profile. The server validates the invoice, stores the submitted invoice, and returns an acknowledgement without stamping/signing it.
 
-Sandbox mode is controlled by the `X-Sandbox-Mode` header. In sandbox mode, locked ICV/PIH checks, database persistence, and chain-state updates are skipped. Schema, hash, XAdES-BES, certificate, and TIN validation still run.
+Sandbox validation uses `POST /sandbox/invoices/clear` and `POST /sandbox/invoices/report`. In sandbox mode, locked ICV/PIH checks, database persistence, and chain-state updates are skipped. Schema, hash, XAdES-BES, certificate, and TIN validation still run.
+
+The e-invoicing portal invoice report shows persisted production submissions for the signed-in taxpayer. Summary counts cover successful and failed production submissions, while the table is limited to the latest 10 rows with their status and error message. Sandbox submissions are validation-only and do not appear in the report.
 
 ## Database
 
@@ -215,7 +220,8 @@ Migrations run automatically on startup from `./migrations`. The active logical 
 - `taxpayers`: registered taxpayer TINs and Argon2 password hashes.
 - `devices`: enrolled device UUIDs, taxpayer ownership, current ICV, and last PIH.
 - `csr_challenges`: hashed enrollment tokens with expiry and usage state.
-- `invoices`: submitted invoice UUIDs, hashes, stored invoice payloads, device IDs, and invoice type.
+- `invoices`: successful submitted invoice UUIDs, hashes, stored invoice payloads, device IDs, and invoice type.
+- `rejected_invoices`: failed production invoice submissions with the public API error message and code returned to the client.
 
 The seed migration inserts test taxpayers `100011` and `100021`.
 

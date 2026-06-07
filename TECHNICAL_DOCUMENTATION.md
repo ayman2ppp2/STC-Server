@@ -113,7 +113,7 @@ Content-Type: text/html; charset=utf-8
 
 ### GET `/e-invoicing`
 
-Serves the taxpayer portal for TIN/password sign-in, e-invoicing description, enrollment token generation, and navigation to the sandbox and API reference.
+Serves the taxpayer portal for TIN/password sign-in, e-invoicing description, enrollment token generation, persisted production invoice reports, and navigation to the sandbox and API reference.
 
 ### GET `/sandbox`
 
@@ -121,7 +121,7 @@ Serves the sandbox console for CSR command generation, device enrollment, canoni
 
 ### GET `/api`
 
-Serves the public API reference page for `/enroll`, `/clear`, `/report`, and `/health_check`.
+Serves the public API reference page for `/prod/enrollment/enroll`, `/prod/invoices/clear`, `/sandbox/invoices/clear`, `/prod/invoices/report`, `/sandbox/invoices/report`, and `/health_check`.
 
 ### GET `/health_check`
 
@@ -135,7 +135,7 @@ Success response:
 
 The response body is empty.
 
-### POST `/enroll`
+### POST `/prod/enrollment/enroll`
 
 Enrolls a device by validating an enrollment token, parsing a DER CSR, issuing a certificate, and inserting a `devices` row.
 
@@ -217,18 +217,15 @@ Error responses include:
 }
 ```
 
-### POST `/clear`
+### POST `/sandbox/invoices/clear`
 
-Submits an invoice for clearance. The invoice must contain a clearance profile and a valid device certificate already known to the server.
+Submits an invoice for sandbox clearance. The invoice must contain a clearance profile and a valid device certificate already known to the server. Sandbox mode validates the invoice end-to-end, returns a stamped clearance response, but does not persist any data or update the ICV/PIH chain.
 
 Request headers:
 
 ```http
 Content-Type: application/json
-X-Sandbox-Mode: true
 ```
-
-`X-Sandbox-Mode` is optional. For `/clear`, sandbox is enabled only when the header value equals `true` case-insensitively.
 
 Request body:
 
@@ -266,20 +263,6 @@ Invalid parse response:
 }
 ```
 
-Inactive device response:
-
-```json
-{
-  "success": false,
-  "message": "Device is not enabled",
-  "data": {
-    "error": {
-      "code": "device_inactive"
-    }
-  }
-}
-```
-
 Pipeline failure response:
 
 ```json
@@ -294,18 +277,75 @@ Pipeline failure response:
 }
 ```
 
-### POST `/report`
+### POST `/prod/invoices/clear`
 
-Submits an invoice for reporting. The invoice must contain a reporting profile and a valid device certificate already known to the server.
+Submits an invoice for production clearance. Behaves identically to sandbox clearance but persists the cleared invoice and updates the device ICV/PIH chain. Validation failures are recorded in the `rejected_invoices` table.
 
 Request headers:
 
 ```http
 Content-Type: application/json
-X-Sandbox-Mode: true
 ```
 
-`X-Sandbox-Mode` is optional. For `/report`, sandbox is enabled when the header is present, regardless of its value.
+Request body:
+
+```json
+{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}
+```
+
+Success response:
+
+```json
+{
+  "success": true,
+  "message": "Invoice cleared",
+  "data": {
+    "cleared_invoice": "BASE64_CLEARED_INVOICE_XML"
+  }
+}
+```
+
+Inactive device response:
+
+```json
+{
+  "success": false,
+  "message": "Device is not enabled",
+  "data": {
+    "error": {
+      "code": "device_inactive"
+    }
+  }
+}
+```
+
+Pipeline failure response (recorded as rejected invoice):
+
+```json
+{
+  "success": false,
+  "message": "Invoice failed validation",
+  "data": {
+    "error": {
+      "code": "invoice_validation_failed"
+    }
+  }
+}
+```
+
+### POST `/sandbox/invoices/report`
+
+Submits an invoice for sandbox reporting. The invoice must contain a reporting profile and a valid device certificate already known to the server. Sandbox mode validates the invoice end-to-end but does not persist invoices or update the ICV/PIH chain.
+
+Request headers:
+
+```http
+Content-Type: application/json
+```
 
 Request body:
 
@@ -323,11 +363,13 @@ Success response:
 {
   "success": true,
   "message": "Invoice reported",
-  "data": null
+  "data": {
+    "submitted": true
+  }
 }
 ```
 
-Invalid parse response:
+Invalid invoice data (invalid parse) response:
 
 ```json
 {
@@ -355,29 +397,47 @@ Pipeline failure response:
 }
 ```
 
-### GET `/get_invoices`
+### POST `/prod/invoices/report`
 
-Debug endpoint that returns the number of rows in `invoices`.
+Submits an invoice for production reporting. Behaves identically to sandbox reporting but persists the submitted invoice and updates the device ICV/PIH chain. Validation failures are recorded in the `rejected_invoices` table.
+
+Request headers:
+
+```http
+Content-Type: application/json
+```
+
+Request body:
+
+```json
+{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}
+```
 
 Success response:
 
 ```json
-42
+{
+  "success": true,
+  "message": "Invoice reported",
+  "data": {
+    "submitted": true
+  }
+}
 ```
 
-Failure response:
-
-```http
-500 Internal Server Error
-```
+Inactive device response:
 
 ```json
 {
   "success": false,
-  "message": "Internal server error",
+  "message": "Device is not enabled",
   "data": {
     "error": {
-      "code": "internal_server_error"
+      "code": "device_inactive"
     }
   }
 }
@@ -399,7 +459,7 @@ Expired unused tokens are cleaned by a background task every hour.
 
 ### CSR Validation And Certificate Issuance
 
-`POST /enroll` performs this work:
+`POST /prod/enrollment/enroll` performs this work:
 
 1. Base64-decodes the CSR.
 2. Parses the CSR as DER.
@@ -415,6 +475,14 @@ Expired unused tokens are cleaned by a background task every hour.
 The generated certificate validity period is 356 days.
 
 ## Invoice Submission
+
+### Taxpayer Portal Report
+
+After sign-in, the e-invoicing portal loads a taxpayer invoice report by authenticating the TIN/password again and combining successful `invoices` rows with failed `rejected_invoices` rows. Successful rows are filtered through `invoices.device_id -> devices.device_uuid -> devices.tin`. Failed rows are filtered through `rejected_invoices.device_id` when available, with a fallback to `rejected_invoices.supplier_tin` for parse failures that could still expose the supplier TIN.
+
+The report includes persisted production submissions only. Sandbox submissions use the `/sandbox/invoices/*` path prefix, skip persistence whether successful or failed, and do not appear in the report.
+
+Summary fields cover all persisted taxpayer production submissions and are computed by an aggregate query. The invoice table is capped at the latest 10 metadata rows ordered by `created_at DESC`; it does not load successful `invoice_bytes` or rejected invoice payloads. Returned fields include total submissions, successful count, failed count, clearance/reporting success and failure counts, unique device count, latest submission timestamp, row limit, and rows with UUID, invoice type, device UUID, created timestamp, hash/submitted hash, status, error code, and error message.
 
 ### Request DTO
 
@@ -445,8 +513,8 @@ The route determines the expected invoice type:
 
 | Route | Expected type |
 |-------|---------------|
-| `POST /clear` | `clearance` |
-| `POST /report` | `reporting` |
+| `POST /invoices/{profile}/clear` | `clearance` |
+| `POST /invoices/{profile}/report` | `reporting` |
 
 The implementation verifies the XML profile against this expected type through `verify_invoice_type`.
 
@@ -462,7 +530,7 @@ xmllint --c14n11 invoice.xml | openssl dgst -sha256 -binary | base64 -w 0
 
 The exact extracted XML subtree and canonicalization path should match the server implementation in `src/services/xml/`.
 
-### Clearance Output
+### Clearance Output (all `/invoices/*/clear` calls)
 
 Clearance mode returns the cleared invoice as base64 XML. During clearance, the service:
 
@@ -476,9 +544,17 @@ Clearance mode returns the cleared invoice as base64 XML. During clearance, the 
 8. Injects QR data derived from invoice hash and signature.
 9. Base64-encodes the final XML.
 
-### Reporting Output
+### Reporting Output (all `/invoices/*/report` calls)
 
-Reporting mode does not stamp or sign the invoice. In non-sandbox mode, it stores the submitted invoice XML as UTF-8 text in `invoices.invoiceb64`.
+Reporting mode does not stamp or sign the invoice. In production mode (`/prod/invoices/report`), it stores the submitted invoice XML as UTF-8 text in `invoices.invoiceb64`.
+
+### Rejected Production Invoices
+
+For production `/prod/invoices/clear` and `/prod/invoices/report` requests that reach the invoice DTO handler but fail parsing, active-device checks, or invoice processing, the server stores a row in `rejected_invoices` before returning the API error. The stored `error_code`, `error_message`, and `http_status` match the sanitized API error response sent to the client.
+
+If storing the rejected production invoice fails, the server logs the persistence failure and returns `Internal server error` because rejected-invoice persistence is required for production failures.
+
+Invalid JSON, unsupported content type, request-body read errors, and body-size limit failures are not stored because they are rejected before the route receives a `SubmitInvoiceDto`.
 
 ## Validation Pipeline
 
@@ -520,18 +596,20 @@ Still performed in sandbox mode:
 - Certificate verification.
 - Supplier certificate/device TIN checks.
 - Customer TIN checks for clearance invoices.
-- Clearance stamping/signing for `/clear` responses.
+- Clearance stamping/signing for all clearance responses.
 
-Header behavior differs by route:
+Sandbox or production mode is determined by the URL path segment:
 
-| Route | Sandbox condition |
-|-------|-------------------|
-| `/clear` | Header `X-Sandbox-Mode` exists and value equals `true` case-insensitively. |
-| `/report` | Header `X-Sandbox-Mode` exists and value equals `true` case-insensitively. |
+| Path segment | Behavior |
+|--------------|----------|
+| `/sandbox/invoices/` | Invoice validated but never persisted; mutations skipped. |
+| `/prod/invoices/` | Full validation, persistence, and ICV/PIH chain update. |
+
+No header-based sandbox switching is supported.
 
 ## Database Schema
 
-Migrations run automatically on startup with `sqlx::migrate!("./migrations")`.
+Migrations run automatically on startup with `Migrator::new("./migrations")`.
 
 ### `taxpayers`
 
@@ -594,7 +672,7 @@ CREATE TABLE invoices (
     uuid UUID PRIMARY KEY,
     hash BYTEA NOT NULL CHECK (octet_length(hash) = 32),
     device_id UUID REFERENCES devices(device_uuid),
-    invoiceb64 TEXT,
+    invoice_bytes BYTEA,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     invoice_type TEXT DEFAULT 'reporting' CHECK (invoice_type IN ('reporting', 'clearance'))
 );
@@ -604,6 +682,25 @@ CREATE INDEX idx_invoices_lookup ON invoices (device_id, invoice_type, created_a
 ```
 
 The migrations also add a named unique constraint on `uuid`. Because `uuid` is already the primary key, this is redundant but present in the migration history.
+
+### `rejected_invoices`
+
+```sql
+CREATE TABLE rejected_invoices (
+    id UUID PRIMARY KEY,
+    submitted_uuid TEXT NOT NULL,
+    submitted_invoice_hash TEXT NOT NULL,
+    submitted_invoice TEXT NOT NULL,
+    endpoint TEXT NOT NULL CHECK (endpoint IN ('clear', 'report')),
+    invoice_type TEXT NOT NULL CHECK (invoice_type IN ('clearance', 'reporting')),
+    error_code TEXT NOT NULL,
+    error_message TEXT NOT NULL,
+    http_status INTEGER NOT NULL,
+    supplier_tin TEXT,
+    device_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
 
 ## Concurrency And State
 
@@ -625,7 +722,7 @@ This prevents concurrent submissions for the same device from racing the ICV/PIH
 
 - The server starts only after it connects to PostgreSQL, runs migrations, loads crypto material, and compiles/loads the XSD schema validator.
 - The JSON request limit is `256 KiB`; larger invoices will be rejected by Actix before route logic runs.
-- `GET /get_invoices` is a debug helper and should not be exposed in a production deployment.
+- There is no debug endpoint for raw invoice rows; production invoice data is only exposed through the authenticated taxpayer portal report.
 - Error responses expose sanitized messages and stable error codes; detailed implementation errors remain in server logs.
 - The e-invoicing portal keeps the taxpayer password only in browser memory for the current session and resends it when generating an enrollment token.
 - The repository integration shell scripts are useful development helpers but are not the source of truth for endpoint contracts.
@@ -674,17 +771,16 @@ openssl req -new \
 TOKEN="100011:replace-with-token-uuid"
 CSR="$(tr -d '\n' < device.csr.b64)"
 
-curl -X POST http://localhost:8080/enroll \
+curl -X POST http://localhost:8080/prod/enrollment/enroll \
   -H "Content-Type: application/json" \
   -d "{\"token\":\"$TOKEN\",\"csr\":\"$CSR\"}"
 ```
 
-### Submit Clearance Invoice
+### Submit Clearance Invoice (Sandbox)
 
 ```bash
-curl -X POST http://localhost:8080/clear \
+curl -X POST http://localhost:8080/sandbox/invoices/clear \
   -H "Content-Type: application/json" \
-  -H "X-Sandbox-Mode: true" \
   -d '{
     "uuid": "550e8400-e29b-41d4-a716-446655440000",
     "invoice_hash": "BASE64_SHA256_HASH",
@@ -692,12 +788,35 @@ curl -X POST http://localhost:8080/clear \
   }'
 ```
 
-### Submit Reporting Invoice
+### Submit Clearance Invoice (Production)
 
 ```bash
-curl -X POST http://localhost:8080/report \
+curl -X POST http://localhost:8080/prod/invoices/clear \
   -H "Content-Type: application/json" \
-  -H "X-Sandbox-Mode: true" \
+  -d '{
+    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+    "invoice_hash": "BASE64_SHA256_HASH",
+    "invoice": "BASE64_UBL_INVOICE_XML"
+  }'
+```
+
+### Submit Reporting Invoice (Sandbox)
+
+```bash
+curl -X POST http://localhost:8080/sandbox/invoices/report \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+    "invoice_hash": "BASE64_SHA256_HASH",
+    "invoice": "BASE64_UBL_INVOICE_XML"
+  }'
+```
+
+### Submit Reporting Invoice (Production)
+
+```bash
+curl -X POST http://localhost:8080/prod/invoices/report \
+  -H "Content-Type: application/json" \
   -d '{
     "uuid": "550e8400-e29b-41d4-a716-446655440000",
     "invoice_hash": "BASE64_SHA256_HASH",

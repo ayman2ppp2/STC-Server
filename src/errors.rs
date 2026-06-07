@@ -23,6 +23,18 @@ impl ApiError {
         Self::new(ErrorCode::InternalServerError)
     }
 
+    pub const fn public_code(&self) -> &'static str {
+        self.code.as_str()
+    }
+
+    pub const fn public_message(&self) -> &'static str {
+        self.code.message()
+    }
+
+    pub const fn public_status(&self) -> StatusCode {
+        self.code.status()
+    }
+
     pub fn from_json_payload(error: &JsonPayloadError) -> Self {
         match error {
             JsonPayloadError::ContentType => Self::new(ErrorCode::UnsupportedContentType),

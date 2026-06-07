@@ -197,6 +197,98 @@
                 color: #6b7e92;
                 margin-bottom: 0;
             }
+            .report-card {
+                grid-column: 1 / -1;
+            }
+            .report-heading {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 16px;
+                margin-bottom: 18px;
+            }
+            .stats {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 12px;
+            }
+            .stat {
+                border: 1px solid #dce7ef;
+                border-radius: 16px;
+                padding: 14px;
+                background: #f8fbfd;
+            }
+            .stat span {
+                display: block;
+                color: #64758a;
+                font-size: 12px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                margin-bottom: 8px;
+            }
+            .stat strong {
+                display: block;
+                color: #091a2b;
+                font-size: 24px;
+            }
+            .table-wrap {
+                overflow-x: auto;
+                margin-top: 18px;
+                border: 1px solid #e2ebf2;
+                border-radius: 16px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                min-width: 1020px;
+            }
+            th,
+            td {
+                text-align: left;
+                padding: 13px 14px;
+                border-bottom: 1px solid #edf2f6;
+                vertical-align: top;
+                font-size: 14px;
+            }
+            th {
+                color: #40576d;
+                background: #f8fbfd;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+            }
+            tr:last-child td {
+                border-bottom: 0;
+            }
+            .badge {
+                display: inline-flex;
+                border-radius: 999px;
+                padding: 5px 9px;
+                background: #e8f2f2;
+                color: #0b6155;
+                font-size: 12px;
+                font-weight: 900;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+            .badge.successful {
+                background: #edf8f2;
+                color: #246340;
+            }
+            .badge.failed {
+                background: #fff1f2;
+                color: #9b2335;
+            }
+            .hash,
+            .mono {
+                font-family: "SFMono-Regular", Consolas, monospace;
+                word-break: break-all;
+            }
+            .empty-row {
+                color: #64758a;
+                text-align: center;
+            }
             @media (max-width: 900px) {
                 .topbar,
                 .hero,
@@ -207,6 +299,17 @@
                     display: grid;
                 }
                 .steps {
+                    grid-template-columns: 1fr;
+                }
+                .report-heading {
+                    display: grid;
+                }
+                .stats {
+                    grid-template-columns: 1fr 1fr;
+                }
+            }
+            @media (max-width: 560px) {
+                .stats {
                     grid-template-columns: 1fr;
                 }
             }
@@ -292,6 +395,51 @@
                         <a class="button secondary" href="/api">View APIs</a>
                     </div>
                 </article>
+
+                <article class="card report-card">
+                    <div class="report-heading">
+                        <div>
+                            <h2>Invoice report</h2>
+                            <p class="note">
+                                Summary totals cover all persisted production
+                                submissions. The table shows the latest 10
+                                successful and failed invoices. Sandbox
+                                submissions are not stored.
+                            </p>
+                        </div>
+                        <button id="refreshReportBtn" class="secondary" onclick="loadInvoiceReport()">Refresh report</button>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat"><span>Total</span><strong id="reportTotal">0</strong></div>
+                        <div class="stat"><span>Successful</span><strong id="reportSuccessful">0</strong></div>
+                        <div class="stat"><span>Failed</span><strong id="reportFailed">0</strong></div>
+                        <div class="stat"><span>Latest</span><strong id="reportLatest">-</strong></div>
+                    </div>
+
+                    <div id="reportResult"></div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Invoice UUID</th>
+                                    <th>Status</th>
+                                    <th>Type</th>
+                                    <th>Device</th>
+                                    <th>Created</th>
+                                    <th>Hash</th>
+                                    <th>Error message</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoiceRows">
+                                <tr>
+                                    <td class="empty-row" colspan="7">Sign in to load invoice history.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
             </section>
         </main>
 
@@ -331,6 +479,7 @@
                     document.getElementById("loginCard").classList.add("hidden");
                     document.getElementById("dashboard").classList.remove("hidden");
                     show("tokenResult", "success", "Signed in. You can now generate an enrollment token.");
+                    loadInvoiceReport();
                 } catch (error) {
                     show("loginResult", "error", "Network error: " + error.message);
                 } finally {
@@ -384,6 +533,112 @@
                 document.getElementById("loginCard").classList.remove("hidden");
                 document.getElementById("loginResult").innerHTML = "";
                 document.getElementById("tokenResult").innerHTML = "";
+                clearInvoiceReport();
+            }
+
+            async function loadInvoiceReport() {
+                if (!session.tin || !session.password) {
+                    show("reportResult", "error", "Sign in first.");
+                    return;
+                }
+
+                const button = document.getElementById("refreshReportBtn");
+                button.disabled = true;
+                button.textContent = "Loading...";
+                document.getElementById("reportResult").innerHTML = "";
+
+                try {
+                    const response = await fetch("/e-invoicing/invoices", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ tin: session.tin, password: session.password }),
+                    });
+                    const payload = await safeJson(response);
+                    if (!response.ok) {
+                        show("reportResult", "error", payload.message || "Invoice report failed.");
+                        return;
+                    }
+
+                    renderInvoiceReport(payload.data);
+                } catch (error) {
+                    show("reportResult", "error", "Network error: " + error.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Refresh report";
+                }
+            }
+
+            function renderInvoiceReport(report) {
+                const summary = report.summary;
+                document.getElementById("reportTotal").textContent = summary.total;
+                document.getElementById("reportSuccessful").textContent = summary.successful;
+                document.getElementById("reportFailed").textContent = summary.failed;
+                document.getElementById("reportLatest").textContent = formatDate(summary.latest_invoice_at);
+
+                const rows = document.getElementById("invoiceRows");
+                if (!report.invoices.length) {
+                    rows.innerHTML = '<tr><td class="empty-row" colspan="7">No persisted production invoice submissions found for this taxpayer.</td></tr>';
+                    show("reportResult", "success", "Invoice report loaded. No persisted submissions found.");
+                    return;
+                }
+
+                rows.innerHTML = report.invoices
+                    .map(
+                        (invoice) => `
+                            <tr>
+                                <td class="mono">${escapeHtml(invoice.uuid)}</td>
+                                <td><span class="badge ${escapeHtml(invoice.status)}">${escapeHtml(invoice.status)}</span></td>
+                                <td><span class="badge">${escapeHtml(invoice.invoice_type)}</span></td>
+                                <td class="mono">${escapeHtml(shorten(invoice.device_id || "-"))}</td>
+                                <td>${escapeHtml(formatDate(invoice.created_at))}</td>
+                                <td class="hash" title="${escapeHtml(invoice.hash_value)}">${escapeHtml(shortenHash(invoice.hash_value))}</td>
+                                <td>${escapeHtml(invoice.error_message || "-")}</td>
+                            </tr>
+                        `,
+                    )
+                    .join("");
+                const shown = report.invoices.length;
+                const total = summary.total;
+                const limit = report.latest_limit || shown;
+                show(
+                    "reportResult",
+                    "success",
+                    `Showing latest ${shown} of ${total} persisted production submission${total === 1 ? "" : "s"}. Table limit: ${limit}.`,
+                );
+            }
+
+            function clearInvoiceReport() {
+                document.getElementById("reportTotal").textContent = "0";
+                document.getElementById("reportSuccessful").textContent = "0";
+                document.getElementById("reportFailed").textContent = "0";
+                document.getElementById("reportLatest").textContent = "-";
+                document.getElementById("reportResult").innerHTML = "";
+                document.getElementById("invoiceRows").innerHTML = '<tr><td class="empty-row" colspan="7">Sign in to load invoice history.</td></tr>';
+            }
+
+            function formatDate(value) {
+                if (!value) {
+                    return "-";
+                }
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) {
+                    return value;
+                }
+                return date.toLocaleString();
+            }
+
+            function shorten(value) {
+                if (!value || value.length <= 18) {
+                    return value || "-";
+                }
+                return value.slice(0, 8) + "..." + value.slice(-6);
+            }
+
+            function shortenHash(value) {
+                if (!value || value.length <= 24) {
+                    return value || "-";
+                }
+                return value.slice(0, 18) + "...";
             }
 
             async function safeJson(response) {
