@@ -1,40 +1,33 @@
 #!/bin/bash
-# Test onboarding flow - token generation and device enrollment
+# Test enrollment flow - token generation and device enrollment
 
 set -e
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 KEY_PATH="${KEY_PATH:-./test-key.pem}"
 
-echo "=== STC Server Onboarding Test ==="
+echo "=== STC Server Enrollment Test ==="
 echo "Base URL: $BASE_URL"
 echo ""
 
-# Test 1: Get onboarding form
-echo "1. Getting onboarding HTML form..."
-curl -s "$BASE_URL/onboard" | head -20
-echo ""
-echo "... (HTML form received)"
-echo ""
-
-# Test 2: Generate token for a registered taxpayer
-echo "2. Generating enrollment token..."
-echo "   Note: company_id must exist in taxpayers table"
+# Test 1: Generate token for a registered taxpayer
+echo "1. Generating enrollment token..."
+echo "   Note: taxpayer TIN must exist in taxpayers table"
 echo ""
 
 # Replace with actual TIN from your taxpayers table
 TAXPAYER_TIN="${TAXPAYER_TIN:-100011}"
+TAXPAYER_PASSWORD="${TAXPAYER_PASSWORD:-password}"
 
-RESPONSE=$(curl -s -X POST "$BASE_URL/onboard" \
+RESPONSE=$(curl -s -X POST "$BASE_URL/e-invoicing/token" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"Test Company\",
-    \"email\": \"test@example.com\",
-    \"company_id\": \"$TAXPAYER_TIN\"
+    \"tin\": \"$TAXPAYER_TIN\",
+    \"password\": \"$TAXPAYER_PASSWORD\"
   }")
 
 echo "$RESPONSE" | jq '.'
-TOKEN=$(echo "$RESPONSE" | jq -r '.token')
+TOKEN=$(echo "$RESPONSE" | jq -r '.data.token')
 echo ""
 
 if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
@@ -45,8 +38,8 @@ fi
 echo "   Token received: ${TOKEN:0:50}..."
 echo ""
 
-# Test 3: Enroll device with CSR
-echo "3. Enrolling device..."
+# Test 2: Enroll device with CSR
+echo "2. Enrolling device..."
 echo "   Note: You need a valid CSR with:"
 echo "   - SerialNumber field = device UUID"
 echo "   - OrganizationName field = TIN"
@@ -69,7 +62,7 @@ echo "   Device UUID: $DEVICE_UUID"
 echo "   CSR generated (base64 DER)"
 echo ""
 
-ENROLL_RESPONSE=$(curl -s -X POST "$BASE_URL/enroll" \
+ENROLL_RESPONSE=$(curl -s -X POST "$BASE_URL/prod/enrollment/enroll" \
     -H "Content-Type: application/json" \
     -d "{
         \"token\": \"$TOKEN\",

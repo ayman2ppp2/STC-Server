@@ -14,7 +14,7 @@ use crate::models::device::Device;
 use crate::services::db::device_service::get_device;
 use crate::services::xml::c14n11::canonicalize_c14n11;
 use crate::services::xml::extractors::{extract_crt, extract_invoice, extract_supplier_id};
-#[derive(Debug, Deserialize, Serialize, FromRow)]
+#[derive(Debug, Clone, Deserialize, Serialize, FromRow)]
 pub struct SubmitInvoiceDto {
     pub uuid: String,
     pub invoice_hash: String,

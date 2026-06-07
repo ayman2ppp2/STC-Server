@@ -29,3 +29,4 @@ tracing-actix-web = "0.7"
 tracing-attributes = "0.1"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 fastxml ="0.8.1"
+argon2 = "0.5"

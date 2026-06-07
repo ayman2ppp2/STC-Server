@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>STC API Reference</title>
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family:
+                    Inter, "Segoe UI", Arial, sans-serif;
+                color: #142235;
+                background: #f5f8fb;
+            }
+            header {
+                background: #0b3b5b;
+                color: #ffffff;
+                padding: 18px 24px;
+            }
+            .topbar,
+            main {
+                max-width: 1120px;
+                margin: 0 auto;
+            }
+            .topbar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 16px;
+            }
+            .brand {
+                font-weight: 800;
+            }
+            nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            nav a {
+                color: #ffffff;
+                text-decoration: none;
+                border: 1px solid rgba(255, 255, 255, 0.24);
+                border-radius: 999px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            main {
+                padding: 34px 24px 72px;
+            }
+            .hero,
+            .endpoint {
+                background: #ffffff;
+                border: 1px solid #dce6ef;
+                border-radius: 22px;
+                padding: 26px;
+                box-shadow: 0 16px 44px rgba(20, 34, 53, 0.07);
+                margin-bottom: 18px;
+            }
+            h1,
+            h2,
+            h3 {
+                color: #091a2b;
+                margin-top: 0;
+            }
+            h1 {
+                font-size: clamp(34px, 5vw, 58px);
+                line-height: 1;
+                letter-spacing: -0.045em;
+                margin-bottom: 16px;
+            }
+            p {
+                color: #52687e;
+                line-height: 1.65;
+            }
+            .method {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                padding: 6px 10px;
+                margin-right: 8px;
+                background: #e8f2f2;
+                color: #0b6155;
+                font-weight: 900;
+                font-size: 12px;
+                letter-spacing: 0.08em;
+            }
+            .base-url {
+                display: inline-block;
+                margin: 10px 0 0;
+                padding: 10px 12px;
+                border-radius: 12px;
+                background: #edf5ff;
+                color: #244b73;
+                font-weight: 800;
+            }
+            code,
+            pre {
+                font-family: "SFMono-Regular", Consolas, monospace;
+            }
+            pre {
+                white-space: pre-wrap;
+                word-break: break-word;
+                border-radius: 14px;
+                background: #0f2030;
+                color: #e8f1f5;
+                padding: 14px;
+                font-size: 13px;
+                line-height: 1.55;
+                overflow-x: auto;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 12px;
+            }
+            th,
+            td {
+                text-align: left;
+                border-bottom: 1px solid #e7eef4;
+                padding: 10px 8px;
+                vertical-align: top;
+            }
+            th {
+                color: #40576d;
+                font-size: 13px;
+            }
+            @media (max-width: 760px) {
+                .topbar {
+                    display: grid;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="topbar">
+                <div class="brand">STC API Reference</div>
+                <nav>
+                    <a href="/">Home</a>
+                    <a href="/e-invoicing">E-Invoicing</a>
+                    <a href="/sandbox">Sandbox</a>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            <section class="hero">
+                <h1>Public integration APIs</h1>
+                <p>
+                    These endpoints are the public server integration points for
+                    device enrollment, invoice clearance, reporting, and health
+                    checks. Generate taxpayer enrollment tokens from the
+                    e-invoicing portal before calling enrollment.
+                </p>
+                <p class="base-url">Base URL: <code>https://stc-server.onrender.com</code></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Path</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>POST</td><td><code>/prod/enrollment/enroll</code></td><td>Enroll a production device CSR using a short-lived taxpayer token.</td></tr>
+                        <tr><td>POST</td><td><code>/prod/invoices/clear</code></td><td>Submit a production clearance invoice and receive a cleared invoice payload.</td></tr>
+                        <tr><td>POST</td><td><code>/prod/invoices/report</code></td><td>Submit a production reporting invoice and receive an acknowledgement.</td></tr>
+                        <tr><td>POST</td><td><code>/sandbox/invoices/clear</code></td><td>Validate a clearance invoice without persistence or chain-state mutation.</td></tr>
+                        <tr><td>POST</td><td><code>/sandbox/invoices/report</code></td><td>Validate a reporting invoice without persistence or chain-state mutation.</td></tr>
+                        <tr><td>GET</td><td><code>/health_check</code></td><td>Return HTTP 200 when the service is reachable.</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">POST</span><code>/prod/enrollment/enroll</code></h2>
+                <p>
+                    Validates a token and DER CSR, issues an STC-signed device
+                    certificate, and records the device. The CSR subject must use
+                    <code>O</code> for taxpayer TIN and <code>serialNumber</code>
+                    for device UUID.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/prod/enrollment/enroll</pre>
+                <pre>{
+  "token": "100011:550e8400-e29b-41d4-a716-446655440000",
+  "csr": "BASE64_DER_CSR"
+}</pre>
+                <h3>Response</h3>
+                <pre>{
+  "success": true,
+  "message": "enrolled",
+  "data": {
+    "certificate": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
+  }
+}</pre>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">POST</span><code>/prod/invoices/clear</code></h2>
+                <p>
+                    Validates a signed clearance invoice, updates signing
+                    metadata, stamps the invoice, stores chain state in normal
+                    mode, and returns the cleared invoice. Production failures
+                    that reach invoice handling are stored with their public API
+                    error message.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/prod/invoices/clear</pre>
+                <pre>{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}</pre>
+                <h3>Response</h3>
+                <pre>{
+  "success": true,
+  "message": "Invoice cleared",
+  "data": {
+    "cleared_invoice": "BASE64_CLEARED_INVOICE_XML"
+  }
+}</pre>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">POST</span><code>/prod/invoices/report</code></h2>
+                <p>
+                    Validates, stores, and acknowledges a production reporting
+                    invoice. Production failures that reach invoice handling are
+                    stored with their public API error message.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/prod/invoices/report</pre>
+                <pre>{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}</pre>
+                <h3>Response</h3>
+                <pre>{
+  "success": true,
+  "message": "Invoice reported",
+  "data": null
+}</pre>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">POST</span><code>/sandbox/invoices/clear</code></h2>
+                <p>
+                    Validates a signed clearance invoice through the sandbox
+                    pipeline. Sandbox submissions are never persisted, successful
+                    or failed, and do not mutate ICV/PIH chain state.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/sandbox/invoices/clear</pre>
+                <pre>{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}</pre>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">POST</span><code>/sandbox/invoices/report</code></h2>
+                <p>
+                    Validates a signed reporting invoice through the sandbox
+                    pipeline. Sandbox submissions are never persisted, successful
+                    or failed, and do not mutate ICV/PIH chain state.
+                </p>
+                <h3>Request</h3>
+                <pre>POST https://stc-server.onrender.com/sandbox/invoices/report</pre>
+                <pre>{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "invoice_hash": "BASE64_SHA256_HASH_OF_CANONICAL_INVOICE",
+  "invoice": "BASE64_UBL_INVOICE_XML"
+}</pre>
+            </section>
+
+            <section class="endpoint">
+                <h2><span class="method">GET</span><code>/health_check</code></h2>
+                <p>Returns an empty HTTP 200 response when the service is running.</p>
+                <pre>curl https://stc-server.onrender.com/health_check</pre>
+            </section>
+        </main>
+    </body>
+</html>

@@ -87,7 +87,13 @@ pub fn validate_xades_bes_signature(
     received_invoice_hash: &[u8],
     certificate: &X509,
 ) -> anyhow::Result<()> {
-    let signature_xml = extract_single_signature(invoice_xml)?;
+    // print!("{:?}", String::from_utf8_lossy(invoice_xml));
+    let invoice_xml = canonicalize_c14n11(invoice_xml.to_vec())?;
+    // println!(
+    //     "after canonicalization: {:?}",
+    //     String::from_utf8_lossy(&invoice_xml)
+    // );
+    let signature_xml = extract_single_signature(&invoice_xml)?;
     let signed_info = extract_signed_info(&signature_xml, Some(DS_NS.as_bytes()))
         .context("failed to extract SignedInfo from signature")?;
     let signed_properties = extract_signed_properties(&signature_xml, Some(XADES_NS.as_bytes()))

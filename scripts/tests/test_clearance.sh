@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test invoice submission to clearance endpoint with sandbox mode
+# Test invoice submission to clearance endpoints
 
 set -e
 
@@ -23,15 +23,14 @@ echo "1. Testing health check..."
 curl -s "$BASE_URL/health_check" && echo ""
 echo ""
 
-# Test 2: Clearance with sandbox mode (skips validation)
-echo "2. Testing clearance endpoint (sandbox mode)..."
+# Test 2: Clearance through sandbox endpoint
+echo "2. Testing clearance endpoint (sandbox)..."
 echo "   Sandbox mode skips: UUID check, PIH chain, persistence, ICV update"
 echo "   Sandbox mode still validates: schema, hash, signature, certificate, TINs"
 echo ""
 
-RESPONSE=$(curl -s -X POST "$BASE_URL/clear" \
+RESPONSE=$(curl -s -X POST "$BASE_URL/sandbox/invoices/clear" \
   -H "Content-Type: application/json" \
-  -H "X-Sandbox-Mode: true" \
   -d "{
     \"invoice_hash\": \"$INVOICE_HASH\",
     \"uuid\": \"$UUID\",
@@ -46,7 +45,7 @@ echo "3. Testing clearance endpoint (production mode)..."
 echo "   Production mode validates and persists invoice chain state"
 echo ""
 
-RESPONSE=$(curl -s -X POST "$BASE_URL/clear" \
+RESPONSE=$(curl -s -X POST "$BASE_URL/prod/invoices/clear" \
   -H "Content-Type: application/json" \
   -d "{
     \"invoice_hash\": \"$INVOICE_HASH\",

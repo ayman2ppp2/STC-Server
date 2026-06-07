@@ -5,10 +5,14 @@ use stc_server::{
     errors::json_error_handler,
     routes::{
         enroll::enroll,
-        health_check::{health_check, hello},
-        invoice_controller::{clearance, get_invoices, reporting},
-        on_boarding::on_board,
-        token_generator::token_generator,
+        health_check::health_check,
+        invoice_controller::{
+            clearance_prod, clearance_sandbox, reporting_prod, reporting_sandbox,
+        },
+        pages::{api_page, e_invoicing_page, home, sandbox_page},
+        taxpayer_portal::{
+            generate_enrollment_token, invoice_report, prepare_invoice_payload, sign_in,
+        },
         verify_qr::verify_qr,
     },
     services::db::token_checking::token_cleanup_loop,
@@ -51,10 +55,10 @@ async fn main() -> std::io::Result<()> {
         .await
         .unwrap_or_else(|e| panic!("Failed to connect to Postgres: {}", e));
 
-    sqlx::migrate!("./migrations")
-        .run(&pool)
+    let migrator = sqlx::migrate::Migrator::new(std::path::Path::new("./migrations"))
         .await
-        .expect("Failed to run migrations");
+        .expect("Failed to load migrations");
+    migrator.run(&pool).await.expect("Failed to run migrations");
 
     tokio::spawn(token_cleanup_loop(pool.clone()));
 
@@ -96,16 +100,37 @@ async fn main() -> std::io::Result<()> {
                     .limit(256 * 1024)
                     .error_handler(json_error_handler),
             )
-            .route("/", web::get().to(hello))
+            .route("/", web::get().to(home))
+            .route("/e-invoicing", web::get().to(e_invoicing_page))
+            .route("/e-invoicing/signin", web::post().to(sign_in))
+            .route(
+                "/e-invoicing/token",
+                web::post().to(generate_enrollment_token),
+            )
+            .route("/e-invoicing/invoices", web::post().to(invoice_report))
+            .route("/sandbox", web::get().to(sandbox_page))
+            .route(
+                "/sandbox/invoice-payload",
+                web::post().to(prepare_invoice_payload),
+            )
+            .route("/api", web::get().to(api_page))
             .route("/health_check", web::get().to(health_check))
-            .route("/clear", web::post().to(clearance))
-            .route("/report", web::post().to(reporting))
-            .route("/enroll", web::post().to(enroll))
-            .route("/onboard", web::get().to(on_board))
-            .route("/onboard", web::post().to(token_generator))
-            .route("/get_invoices", web::get().to(get_invoices))
-            // https://stc-server.onrender.com/clear
-            // https://stc-server.onrender.com/report
+            .service(
+                web::scope("/prod")
+                    .service(
+                        web::scope("/invoices")
+                            .route("/clear", web::post().to(clearance_prod))
+                            .route("/report", web::post().to(reporting_prod)),
+                    )
+                    .route("/enrollment/enroll", web::post().to(enroll)),
+            )
+            .service(
+                web::scope("/sandbox").service(
+                    web::scope("/invoices")
+                        .route("/clear", web::post().to(clearance_sandbox))
+                        .route("/report", web::post().to(reporting_sandbox)),
+                ),
+            )
             .route("/verify_qr", web::post().to(verify_qr))
     })
     .bind(("0.0.0.0", port))?

@@ -23,6 +23,18 @@ impl ApiError {
         Self::new(ErrorCode::InternalServerError)
     }
 
+    pub const fn public_code(&self) -> &'static str {
+        self.code.as_str()
+    }
+
+    pub const fn public_message(&self) -> &'static str {
+        self.code.message()
+    }
+
+    pub const fn public_status(&self) -> StatusCode {
+        self.code.status()
+    }
+
     pub fn from_json_payload(error: &JsonPayloadError) -> Self {
         match error {
             JsonPayloadError::ContentType => Self::new(ErrorCode::UnsupportedContentType),
@@ -63,7 +75,10 @@ impl ApiError {
         }
 
         let error_text = error_chain_text(error);
-        if contains_any(&error_text, &["not found or expired", "token hash mismatch"]) {
+        if contains_any(
+            &error_text,
+            &["not found or expired", "token hash mismatch"],
+        ) {
             Self::new(ErrorCode::InvalidOrExpiredToken)
         } else if error_text.contains("missing the serial number") {
             Self::new(ErrorCode::CsrDeviceIdMissing)
@@ -197,11 +212,7 @@ impl ApiError {
             Self::new(ErrorCode::QrCertificateMissing)
         } else if contains_any(
             &error_text,
-            &[
-                "truncated tlv",
-                "unsupported tlv",
-                "tlv length overflow",
-            ],
+            &["truncated tlv", "unsupported tlv", "tlv length overflow"],
         ) {
             Self::new(ErrorCode::InvalidQrTlv)
         } else if error_text.contains("certificate does not match") {
@@ -246,6 +257,7 @@ pub enum ErrorCode {
     RequestBodyReadError,
     InvalidRequestBody,
     InternalServerError,
+    InvalidCredentials,
     CompanyIdNotRegistered,
     InvalidCsrEncoding,
     InvalidCsr,
@@ -297,6 +309,7 @@ impl ErrorCode {
             Self::RequestBodyReadError => "request_body_read_error",
             Self::InvalidRequestBody => "invalid_request_body",
             Self::InternalServerError => "internal_server_error",
+            Self::InvalidCredentials => "invalid_credentials",
             Self::CompanyIdNotRegistered => "company_id_not_registered",
             Self::InvalidCsrEncoding => "invalid_csr_encoding",
             Self::InvalidCsr => "invalid_csr",
@@ -348,6 +361,7 @@ impl ErrorCode {
             Self::RequestBodyReadError => "Request body could not be read",
             Self::InvalidRequestBody => "Request body is invalid",
             Self::InternalServerError => "Internal server error",
+            Self::InvalidCredentials => "Invalid TIN or password",
             Self::CompanyIdNotRegistered => "Company ID is not registered",
             Self::InvalidCsrEncoding => "CSR must be valid base64",
             Self::InvalidCsr => "CSR is invalid",
@@ -377,7 +391,9 @@ impl ErrorCode {
             Self::InvoiceChainMismatch => "Invoice chain validation failed",
             Self::CustomerSupplierTinMatch => "Customer TIN cannot match supplier TIN",
             Self::CustomerTinNotRegistered => "Customer TIN not registered",
-            Self::SupplierTinMismatch => "Supplier TIN does not match invoice certificate or device",
+            Self::SupplierTinMismatch => {
+                "Supplier TIN does not match invoice certificate or device"
+            }
             Self::InvoiceSignatureInvalid => "Invoice signature or certificate is invalid",
             Self::InvoiceValidationFailed => "Invoice failed validation",
             Self::InvalidQrEncoding => "QR payload must be valid base64",
@@ -396,6 +412,7 @@ impl ErrorCode {
             Self::UnsupportedContentType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::RequestBodyTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
             Self::CompanyIdNotRegistered
             | Self::DeviceNotFound
             | Self::SupplierTinNotRegistered

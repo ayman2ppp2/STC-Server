@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy the binary
 COPY --from=builder /app/target/release/stc-server /app/stc-server
+COPY --from=builder /app/migrations /app/migrations
 
 # Change ownership to the non-root user
 RUN chown -R appuser:appuser /app
