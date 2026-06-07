@@ -1,15 +1,25 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct TaxpayerCredentialsDto {
-    pub tin: String,
-    pub password: String,
+    #[serde(default)]
+    pub tin: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct TaxpayerDto {
     pub tin: String,
     pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TaxpayerProfileDto {
+    pub tin: String,
+    pub name: String,
+    pub address: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Serialize)]

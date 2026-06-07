@@ -1,3 +1,5 @@
+use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+use actix_web::cookie::Key;
 use actix_web::{App, HttpMessage, HttpServer, dev::Service, http::header, web};
 use stc_server::{
     config::crypto_config::Crypto,
@@ -9,9 +11,10 @@ use stc_server::{
         invoice_controller::{
             clearance_prod, clearance_sandbox, reporting_prod, reporting_sandbox,
         },
-        pages::{api_page, e_invoicing_page, home, sandbox_page},
+        pages::{api_page, e_invoicing_page, home, login_page, sandbox_page},
         taxpayer_portal::{
-            generate_enrollment_token, invoice_report, prepare_invoice_payload, sign_in,
+            generate_enrollment_token, invoice_report, prepare_invoice_payload, sign_in, sign_out,
+            taxpayer_me,
         },
         verify_qr::verify_qr,
     },
@@ -71,6 +74,16 @@ async fn main() -> std::io::Result<()> {
     let crypto_data = web::Data::new(crypto_config);
     let pool_data = web::Data::new(pool);
     let xsd_schema = web::Data::new(xsd_schema);
+    let session_key = match std::env::var("SESSION_SECRET") {
+        Ok(val) => Key::from(val.as_bytes()),
+        Err(_) => {
+            tracing::warn!(
+                "SESSION_SECRET not set; using ephemeral session key. Logged-in sessions will not survive restarts."
+            );
+            Key::generate()
+        }
+    };
+
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
@@ -92,6 +105,10 @@ async fn main() -> std::io::Result<()> {
                     Ok(res)
                 }
             })
+            .wrap(SessionMiddleware::new(
+                CookieSessionStore::default(),
+                session_key.clone(),
+            ))
             .app_data(xsd_schema.clone())
             .app_data(pool_data.clone())
             .app_data(crypto_data.clone())
@@ -102,7 +119,10 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(home))
             .route("/e-invoicing", web::get().to(e_invoicing_page))
+            .route("/e-invoicing/login", web::get().to(login_page))
             .route("/e-invoicing/signin", web::post().to(sign_in))
+            .route("/e-invoicing/logout", web::post().to(sign_out))
+            .route("/e-invoicing/me", web::get().to(taxpayer_me))
             .route(
                 "/e-invoicing/token",
                 web::post().to(generate_enrollment_token),

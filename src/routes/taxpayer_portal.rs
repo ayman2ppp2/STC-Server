@@ -1,3 +1,4 @@
+use actix_session::Session;
 use actix_web::{HttpResponse, web};
 use base64::{Engine, engine::general_purpose};
 use serde_json::json;
@@ -10,12 +11,12 @@ use crate::{
         taxpayer_portal::{
             EnrollmentTokenDto, InvoicePayloadDto, InvoiceReportDto, InvoiceReportRowDto,
             InvoiceReportSummaryDto, PreparedInvoicePayloadDto, TaxpayerCredentialsDto,
-            TaxpayerDto,
+            TaxpayerDto, TaxpayerProfileDto,
         },
     },
     services::{
         crypto::pki_service::compute_hash,
-        db::taxpayer_auth::authenticate_taxpayer,
+        db::taxpayer_auth::{authenticate_taxpayer, fetch_taxpayer_profile},
         pipeline::onboarding_service,
         xml::{c14n11::canonicalize_c14n11, extractors::extract_invoice},
     },
@@ -36,18 +37,38 @@ struct InvoiceReportSummaryRow {
     latest_invoice_at: Option<String>,
 }
 
+fn require_tin(session: &Session) -> Result<String, ApiError> {
+    session
+        .get::<String>("tin")
+        .map_err(|_| ApiError::internal())?
+        .ok_or_else(|| ApiError::new(ErrorCode::Unauthenticated))
+}
+
 pub async fn sign_in(
+    session: Session,
     credentials: web::Json<TaxpayerCredentialsDto>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ApiError> {
     let credentials = credentials.into_inner();
-    let taxpayer = authenticate_taxpayer(&credentials.tin, &credentials.password, &pool)
+    let tin = credentials.tin.ok_or_else(|| {
+        tracing::error!("Sign-in missing TIN");
+        ApiError::new(ErrorCode::InvalidCredentials)
+    })?;
+    let password = credentials.password.ok_or_else(|| {
+        tracing::error!("Sign-in missing password");
+        ApiError::new(ErrorCode::InvalidCredentials)
+    })?;
+    let taxpayer = authenticate_taxpayer(&tin, &password, &pool)
         .await
         .map_err(|error| {
-            tracing::error!(tin = %credentials.tin, error = %error, "Taxpayer sign-in failed");
+            tracing::error!(tin = %tin, error = %error, "Taxpayer sign-in failed");
             ApiError::internal()
         })?
         .ok_or_else(|| ApiError::new(ErrorCode::InvalidCredentials))?;
+
+    session
+        .insert("tin", &taxpayer.tin)
+        .map_err(|_| ApiError::internal())?;
 
     Ok(HttpResponse::Ok().json(ApiResponse {
         success: true,
@@ -59,23 +80,77 @@ pub async fn sign_in(
     }))
 }
 
+pub async fn taxpayer_me(
+    session: Session,
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse, ApiError> {
+    let tin = require_tin(&session)?;
+
+    let profile = fetch_taxpayer_profile(&tin, &pool)
+        .await
+        .map_err(|error| {
+            tracing::error!(tin = %tin, error = %error, "Failed to fetch taxpayer profile");
+            ApiError::internal()
+        })?
+        .ok_or_else(|| {
+            tracing::error!(tin = %tin, "Taxpayer not found after session authentication");
+            ApiError::new(ErrorCode::CompanyIdNotRegistered)
+        })?;
+
+    Ok(HttpResponse::Ok().json(ApiResponse {
+        success: true,
+        message: "OK".to_string(),
+        data: Some(TaxpayerProfileDto {
+            tin: profile.tin,
+            name: profile.name,
+            address: profile.address,
+            created_at: profile.created_at,
+        }),
+    }))
+}
+
+pub async fn sign_out(session: Session) -> HttpResponse {
+    session.purge();
+    HttpResponse::Found()
+        .append_header(("Location", "/e-invoicing/login"))
+        .finish()
+}
+
 pub async fn generate_enrollment_token(
+    session: Session,
     credentials: web::Json<TaxpayerCredentialsDto>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ApiError> {
-    let credentials = credentials.into_inner();
-    let taxpayer = authenticate_taxpayer(&credentials.tin, &credentials.password, &pool)
-        .await
-        .map_err(|error| {
-            tracing::error!(tin = %credentials.tin, error = %error, "Taxpayer token authentication failed");
-            ApiError::internal()
-        })?
-        .ok_or_else(|| ApiError::new(ErrorCode::InvalidCredentials))?;
+    let (tin, name) = if let Ok(Some(t)) = session.get::<String>("tin") {
+        let profile = fetch_taxpayer_profile(&t, &pool)
+            .await
+            .map_err(|_| ApiError::internal())?
+            .ok_or_else(|| ApiError::new(ErrorCode::CompanyIdNotRegistered))?;
+        (profile.tin, profile.name)
+    } else {
+        let credentials = credentials.into_inner();
+        let tin = credentials.tin.ok_or_else(|| {
+            tracing::error!("Token generation missing TIN");
+            ApiError::new(ErrorCode::InvalidCredentials)
+        })?;
+        let password = credentials.password.ok_or_else(|| {
+            tracing::error!("Token generation missing password");
+            ApiError::new(ErrorCode::InvalidCredentials)
+        })?;
+        let taxpayer = authenticate_taxpayer(&tin, &password, &pool)
+            .await
+            .map_err(|error| {
+                tracing::error!(tin = %tin, error = %error, "Taxpayer token authentication failed");
+                ApiError::internal()
+            })?
+            .ok_or_else(|| ApiError::new(ErrorCode::InvalidCredentials))?;
+        (taxpayer.tin, taxpayer.name)
+    };
 
-    let onboarding = onboarding_service::generate_token(&taxpayer.tin, &pool)
+    let onboarding = onboarding_service::generate_token(&tin, &pool)
         .await
         .map_err(|error| {
-            tracing::error!(tin = %taxpayer.tin, error = %error, "Enrollment token generation failed");
+            tracing::error!(tin = %tin, error = %error, "Enrollment token generation failed");
             ApiError::from_token_generation(&error)
         })?;
 
@@ -83,8 +158,8 @@ pub async fn generate_enrollment_token(
         success: true,
         message: "Token generated successfully. Use this token within 5 minutes.".to_string(),
         data: Some(json!(EnrollmentTokenDto {
-            tin: taxpayer.tin,
-            name: taxpayer.name,
+            tin: tin.clone(),
+            name,
             token: onboarding.token,
             expires_in_seconds: 300,
         })),
@@ -92,17 +167,31 @@ pub async fn generate_enrollment_token(
 }
 
 pub async fn invoice_report(
+    session: Session,
     credentials: web::Json<TaxpayerCredentialsDto>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ApiError> {
-    let credentials = credentials.into_inner();
-    let taxpayer = authenticate_taxpayer(&credentials.tin, &credentials.password, &pool)
-        .await
-        .map_err(|error| {
-            tracing::error!(tin = %credentials.tin, error = %error, "Taxpayer invoice report authentication failed");
-            ApiError::internal()
-        })?
-        .ok_or_else(|| ApiError::new(ErrorCode::InvalidCredentials))?;
+    let tin = if let Ok(Some(t)) = session.get::<String>("tin") {
+        t
+    } else {
+        let credentials = credentials.into_inner();
+        let tin = credentials.tin.ok_or_else(|| {
+            tracing::error!("Invoice report missing TIN");
+            ApiError::new(ErrorCode::InvalidCredentials)
+        })?;
+        let password = credentials.password.ok_or_else(|| {
+            tracing::error!("Invoice report missing password");
+            ApiError::new(ErrorCode::InvalidCredentials)
+        })?;
+        let taxpayer = authenticate_taxpayer(&tin, &password, &pool)
+            .await
+            .map_err(|error| {
+                tracing::error!(tin = %tin, error = %error, "Taxpayer invoice report authentication failed");
+                ApiError::internal()
+            })?
+            .ok_or_else(|| ApiError::new(ErrorCode::InvalidCredentials))?;
+        taxpayer.tin
+    };
 
     let summary = sqlx::query_as::<_, InvoiceReportSummaryRow>(
         r#"
@@ -141,11 +230,11 @@ pub async fn invoice_report(
         FROM submissions
         "#,
     )
-    .bind(&taxpayer.tin)
+    .bind(&tin)
     .fetch_one(pool.get_ref())
     .await
     .map_err(|error| {
-        tracing::error!(tin = %taxpayer.tin, error = %error, "Failed to fetch taxpayer invoice report summary");
+        tracing::error!(tin = %tin, error = %error, "Failed to fetch taxpayer invoice report summary");
         ApiError::internal()
     })?;
 
@@ -196,12 +285,12 @@ pub async fn invoice_report(
         LIMIT $2
         "#,
     )
-    .bind(&taxpayer.tin)
+    .bind(&tin)
     .bind(INVOICE_REPORT_LIMIT)
     .fetch_all(pool.get_ref())
     .await
     .map_err(|error| {
-        tracing::error!(tin = %taxpayer.tin, error = %error, "Failed to fetch taxpayer invoice report");
+        tracing::error!(tin = %tin, error = %error, "Failed to fetch taxpayer invoice report");
         ApiError::internal()
     })?;
 

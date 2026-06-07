@@ -258,6 +258,7 @@ pub enum ErrorCode {
     InvalidRequestBody,
     InternalServerError,
     InvalidCredentials,
+    Unauthenticated,
     CompanyIdNotRegistered,
     InvalidCsrEncoding,
     InvalidCsr,
@@ -310,6 +311,7 @@ impl ErrorCode {
             Self::InvalidRequestBody => "invalid_request_body",
             Self::InternalServerError => "internal_server_error",
             Self::InvalidCredentials => "invalid_credentials",
+            Self::Unauthenticated => "unauthenticated",
             Self::CompanyIdNotRegistered => "company_id_not_registered",
             Self::InvalidCsrEncoding => "invalid_csr_encoding",
             Self::InvalidCsr => "invalid_csr",
@@ -362,6 +364,7 @@ impl ErrorCode {
             Self::InvalidRequestBody => "Request body is invalid",
             Self::InternalServerError => "Internal server error",
             Self::InvalidCredentials => "Invalid TIN or password",
+            Self::Unauthenticated => "Authentication required. Please sign in.",
             Self::CompanyIdNotRegistered => "Company ID is not registered",
             Self::InvalidCsrEncoding => "CSR must be valid base64",
             Self::InvalidCsr => "CSR is invalid",
@@ -412,7 +415,7 @@ impl ErrorCode {
             Self::UnsupportedContentType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::RequestBodyTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Self::InvalidCredentials | Self::Unauthenticated => StatusCode::UNAUTHORIZED,
             Self::CompanyIdNotRegistered
             | Self::DeviceNotFound
             | Self::SupplierTinNotRegistered
