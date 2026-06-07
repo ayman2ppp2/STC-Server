@@ -1,6 +1,7 @@
 use actix_session::Session;
 use actix_web::{HttpResponse, web};
 use base64::{Engine, engine::general_purpose};
+use chrono::NaiveDate;
 use serde_json::json;
 use sqlx::PgPool;
 
@@ -9,9 +10,9 @@ use crate::{
     models::{
         responses::ApiResponse,
         taxpayer_portal::{
-            EnrollmentTokenDto, InvoicePayloadDto, InvoiceReportDto, InvoiceReportRowDto,
-            InvoiceReportSummaryDto, PreparedInvoicePayloadDto, TaxpayerCredentialsDto,
-            TaxpayerDto, TaxpayerProfileDto,
+            EnrollmentTokenDto, InvoicePayloadDto, InvoiceReportDto, InvoiceReportRequestDto,
+            InvoiceReportRowDto, InvoiceReportSummaryDto, PreparedInvoicePayloadDto,
+            TaxpayerCredentialsDto, TaxpayerDto, TaxpayerProfileDto,
         },
     },
     services::{
@@ -22,7 +23,8 @@ use crate::{
     },
 };
 
-const INVOICE_REPORT_LIMIT: i64 = 10;
+const DEFAULT_INVOICE_REPORT_LIMIT: i64 = 25;
+const MAX_INVOICE_REPORT_LIMIT: i64 = 100;
 
 #[derive(sqlx::FromRow)]
 struct InvoiceReportSummaryRow {
@@ -37,11 +39,88 @@ struct InvoiceReportSummaryRow {
     latest_invoice_at: Option<String>,
 }
 
+struct InvoiceReportFilters {
+    status: String,
+    invoice_type: String,
+    search: Option<String>,
+    from: Option<NaiveDate>,
+    to: Option<NaiveDate>,
+    limit: i64,
+    offset: i64,
+}
+
 fn require_tin(session: &Session) -> Result<String, ApiError> {
     session
         .get::<String>("tin")
         .map_err(|_| ApiError::internal())?
         .ok_or_else(|| ApiError::new(ErrorCode::Unauthenticated))
+}
+
+fn parse_report_filters(
+    request: &InvoiceReportRequestDto,
+) -> Result<InvoiceReportFilters, ApiError> {
+    let status =
+        normalize_report_choice(request.status.as_deref(), &["all", "successful", "failed"])?;
+    let invoice_type = normalize_report_choice(
+        request.invoice_type.as_deref(),
+        &["all", "clearance", "reporting"],
+    )?;
+    let search = trimmed_optional(request.search.as_deref());
+    let from = parse_report_date(request.from.as_deref())?;
+    let to = parse_report_date(request.to.as_deref())?;
+
+    if let (Some(from), Some(to)) = (from, to)
+        && from > to
+    {
+        return Err(ApiError::new(ErrorCode::InvalidRequestBody));
+    }
+
+    let limit = request
+        .limit
+        .unwrap_or(DEFAULT_INVOICE_REPORT_LIMIT)
+        .clamp(1, MAX_INVOICE_REPORT_LIMIT);
+    let offset = request.offset.unwrap_or(0).max(0);
+
+    Ok(InvoiceReportFilters {
+        status,
+        invoice_type,
+        search,
+        from,
+        to,
+        limit,
+        offset,
+    })
+}
+
+fn normalize_report_choice(value: Option<&str>, allowed: &[&str]) -> Result<String, ApiError> {
+    let value = value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("all")
+        .to_ascii_lowercase();
+
+    if allowed.contains(&value.as_str()) {
+        Ok(value)
+    } else {
+        Err(ApiError::new(ErrorCode::InvalidRequestBody))
+    }
+}
+
+fn trimmed_optional(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn parse_report_date(value: Option<&str>) -> Result<Option<NaiveDate>, ApiError> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+
+    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .map(Some)
+        .map_err(|_| ApiError::new(ErrorCode::InvalidRequestBody))
 }
 
 pub async fn sign_in(
@@ -168,18 +247,20 @@ pub async fn generate_enrollment_token(
 
 pub async fn invoice_report(
     session: Session,
-    credentials: web::Json<TaxpayerCredentialsDto>,
+    request: web::Json<InvoiceReportRequestDto>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ApiError> {
+    let request = request.into_inner();
+    let filters = parse_report_filters(&request)?;
+
     let tin = if let Ok(Some(t)) = session.get::<String>("tin") {
         t
     } else {
-        let credentials = credentials.into_inner();
-        let tin = credentials.tin.ok_or_else(|| {
+        let tin = request.tin.ok_or_else(|| {
             tracing::error!("Invoice report missing TIN");
             ApiError::new(ErrorCode::InvalidCredentials)
         })?;
-        let password = credentials.password.ok_or_else(|| {
+        let password = request.password.ok_or_else(|| {
             tracing::error!("Invoice report missing password");
             ApiError::new(ErrorCode::InvalidCredentials)
         })?;
@@ -238,6 +319,67 @@ pub async fn invoice_report(
         ApiError::internal()
     })?;
 
+    let filtered_total = sqlx::query_scalar::<_, i64>(
+        r#"
+        WITH submissions AS (
+            SELECT
+                i.uuid::TEXT AS uuid,
+                COALESCE(i.invoice_type, 'unknown') AS invoice_type,
+                i.device_id::TEXT AS device_id,
+                encode(i.hash, 'hex') AS hash_value,
+                i.created_at AS created_at_raw,
+                'successful' AS status,
+                NULL::TEXT AS error_code,
+                NULL::TEXT AS error_message
+            FROM invoices i
+            INNER JOIN devices d ON d.device_uuid = i.device_id
+            WHERE d.tin = $1
+
+            UNION ALL
+
+            SELECT
+                r.submitted_uuid AS uuid,
+                r.invoice_type,
+                r.device_id::TEXT AS device_id,
+                r.submitted_invoice_hash AS hash_value,
+                r.created_at AS created_at_raw,
+                'failed' AS status,
+                r.error_code,
+                r.error_message
+            FROM rejected_invoices r
+            LEFT JOIN devices d ON d.device_uuid = r.device_id
+            WHERE d.tin = $1
+               OR (r.device_id IS NULL AND r.supplier_tin = $1)
+        )
+        SELECT COUNT(*)
+        FROM submissions
+        WHERE ($2 = 'all' OR status = $2)
+          AND ($3 = 'all' OR invoice_type = $3)
+          AND (
+              $4::TEXT IS NULL
+              OR uuid ILIKE '%' || $4 || '%'
+              OR COALESCE(device_id, '') ILIKE '%' || $4 || '%'
+              OR hash_value ILIKE '%' || $4 || '%'
+              OR COALESCE(error_code, '') ILIKE '%' || $4 || '%'
+              OR COALESCE(error_message, '') ILIKE '%' || $4 || '%'
+          )
+          AND ($5::DATE IS NULL OR created_at_raw >= $5::DATE)
+          AND ($6::DATE IS NULL OR created_at_raw < ($6::DATE + INTERVAL '1 day'))
+        "#,
+    )
+    .bind(&tin)
+    .bind(&filters.status)
+    .bind(&filters.invoice_type)
+    .bind(&filters.search)
+    .bind(filters.from)
+    .bind(filters.to)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|error| {
+        tracing::error!(tin = %tin, error = %error, "Failed to count taxpayer invoice report");
+        ApiError::internal()
+    })?;
+
     let invoices = sqlx::query_as::<_, InvoiceReportRowDto>(
         r#"
         SELECT
@@ -281,12 +423,31 @@ pub async fn invoice_report(
             WHERE d.tin = $1
                OR (r.device_id IS NULL AND r.supplier_tin = $1)
         ) invoice_report
+        WHERE ($2 = 'all' OR status = $2)
+          AND ($3 = 'all' OR invoice_type = $3)
+          AND (
+              $4::TEXT IS NULL
+              OR uuid ILIKE '%' || $4 || '%'
+              OR COALESCE(device_id, '') ILIKE '%' || $4 || '%'
+              OR hash_value ILIKE '%' || $4 || '%'
+              OR COALESCE(error_code, '') ILIKE '%' || $4 || '%'
+              OR COALESCE(error_message, '') ILIKE '%' || $4 || '%'
+          )
+          AND ($5::DATE IS NULL OR created_at_raw >= $5::DATE)
+          AND ($6::DATE IS NULL OR created_at_raw < ($6::DATE + INTERVAL '1 day'))
         ORDER BY created_at_raw DESC
-        LIMIT $2
+        LIMIT $7
+        OFFSET $8
         "#,
     )
     .bind(&tin)
-    .bind(INVOICE_REPORT_LIMIT)
+    .bind(&filters.status)
+    .bind(&filters.invoice_type)
+    .bind(&filters.search)
+    .bind(filters.from)
+    .bind(filters.to)
+    .bind(filters.limit)
+    .bind(filters.offset)
     .fetch_all(pool.get_ref())
     .await
     .map_err(|error| {
@@ -312,7 +473,11 @@ pub async fn invoice_report(
         data: Some(InvoiceReportDto {
             summary,
             invoices,
-            latest_limit: INVOICE_REPORT_LIMIT as usize,
+            filtered_total: filtered_total as usize,
+            limit: filters.limit as usize,
+            offset: filters.offset as usize,
+            has_next: filters.offset + filters.limit < filtered_total,
+            has_previous: filters.offset > 0,
         }),
     }))
 }

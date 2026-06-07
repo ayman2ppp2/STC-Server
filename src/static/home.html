@@ -1,317 +1,658 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>ديوان الضرائب السوداني | Sudan Taxation Chamber</title>
+        <title>Sudan Taxation Chamber</title>
         <style>
             * { box-sizing: border-box; }
+            :root {
+                --navy: #12324a;
+                --navy-dark: #08243a;
+                --green: #12804f;
+                --gold: #d7a83f;
+                --red: #bf2f2f;
+                --ink: #1d2a36;
+                --muted: #657586;
+                --line: #e2e7ec;
+                --soft: #f5f7fa;
+                --white: #ffffff;
+            }
             body {
-                margin: 0; min-height: 100vh;
-                font-family: "Noto Sans Arabic", "Inter", "Segoe UI", Arial, sans-serif;
-                color: #1a2a3a;
-                background: #f6f4f0;
+                margin: 0;
+                color: var(--ink);
+                background: var(--white);
+                font-family: "Segoe UI", Arial, sans-serif;
             }
-            .top-banner {
-                background: #0b2a3d;
-                color: #ffffff;
-                padding: 6px 0;
-                font-size: 12px;
-                text-align: center;
-                letter-spacing: 0.06em;
-                border-bottom: 2px solid #c8a84e;
+            a { color: inherit; }
+            .top-strip {
+                background: var(--navy-dark);
+                color: #dce6ef;
+                font-size: 13px;
             }
-            .top-banner span { opacity: 0.8; }
-            header {
-                max-width: 1200px; margin: 0 auto;
-                padding: 20px 24px;
-                display: flex; align-items: center; justify-content: space-between; gap: 18px;
+            .top-inner, .masthead, .nav-inner, .section, .footer-inner {
+                max-width: 1180px;
+                margin: 0 auto;
+                padding-left: 22px;
+                padding-right: 22px;
+            }
+            .top-inner {
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                padding-top: 9px;
+                padding-bottom: 9px;
                 flex-wrap: wrap;
             }
-            .brand {
-                display: flex; align-items: center; gap: 16px;
+            .masthead {
+                display: grid;
+                grid-template-columns: 1fr auto 1fr;
+                gap: 24px;
+                align-items: center;
+                padding-top: 18px;
+                padding-bottom: 18px;
             }
-            .emblem {
-                width: 54px; height: 54px;
-                border-radius: 50%;
-                background: linear-gradient(135deg, #0b2a3d, #1a5a3a);
-                display: grid; place-items: center;
-                color: #c8a84e;
-                font-size: 22px; font-weight: 900;
-                box-shadow: 0 4px 12px rgba(11,42,61,0.2);
-                flex-shrink: 0;
+            .ministry-logo, .tax-brand {
+                display: flex;
+                align-items: center;
+                gap: 14px;
             }
-            .brand-text { line-height: 1.3; }
-            .brand-text .ar {
-                display: block; font-size: 20px; font-weight: 800;
-                color: #0b2a3d;
+            .ministry-logo img, .tax-brand img {
+                max-height: 62px;
+                max-width: 180px;
+                object-fit: contain;
             }
-            .brand-text .en {
-                display: block; font-size: 13px; color: #5a6f7f;
-                letter-spacing: 0.04em;
+            .emblem img {
+                width: 74px;
+                height: 74px;
+                object-fit: contain;
             }
-            nav {
-                display: flex; flex-wrap: wrap; gap: 8px;
+            .brand-title strong {
+                display: block;
+                color: var(--navy);
+                font-size: 21px;
+                line-height: 1.2;
             }
-            nav a {
-                font-size: 13px; font-weight: 700;
-                color: #1a2a3a;
+            .brand-title span {
+                color: var(--muted);
+                font-size: 13px;
+            }
+            .nav-bar {
+                background: var(--green);
+                color: var(--white);
+                box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+            }
+            .nav-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 18px;
+                flex-wrap: wrap;
+            }
+            .site-nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 2px;
+            }
+            .site-nav a, .app-links a {
                 text-decoration: none;
-                padding: 8px 14px;
-                border-radius: 999px;
-                border: 1px solid #d5d0c8;
-                background: rgba(255,255,255,0.7);
-                transition: 0.15s;
+                font-size: 14px;
+                font-weight: 700;
+                padding: 15px 12px;
+                display: inline-flex;
+                align-items: center;
             }
-            nav a:hover {
-                background: #0b2a3d;
-                color: #ffffff;
-                border-color: #0b2a3d;
-            }
-            main {
-                max-width: 1200px; margin: 0 auto;
-                padding: 10px 24px 60px;
+            .site-nav a:hover, .app-links a:hover { background: rgba(255,255,255,0.13); }
+            .app-links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 2px;
             }
             .hero {
-                background: #ffffff;
-                border: 1px solid #e2ddd4;
+                position: relative;
+                min-height: 430px;
+                display: grid;
+                align-items: center;
+                overflow: hidden;
+                background:
+                    linear-gradient(90deg, rgba(8,36,58,0.92), rgba(8,36,58,0.58), rgba(8,36,58,0.12)),
+                    url("https://tax.gov.sd/wp-content/uploads/2026/04/vision2.png") center/cover no-repeat;
+                color: var(--white);
+            }
+            .hero-content {
+                max-width: 1180px;
+                margin: 0 auto;
+                padding: 58px 22px;
+                width: 100%;
+            }
+            .eyebrow {
+                display: inline-flex;
+                padding: 7px 12px;
+                border-radius: 999px;
+                background: rgba(215,168,63,0.95);
+                color: var(--navy-dark);
+                font-size: 12px;
+                font-weight: 900;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+            }
+            .hero h1 {
+                max-width: 760px;
+                margin: 18px 0 16px;
+                font-size: clamp(34px, 5vw, 62px);
+                line-height: 1.02;
+                letter-spacing: -0.035em;
+            }
+            .hero p {
+                max-width: 650px;
+                color: #e4edf4;
+                font-size: 18px;
+                line-height: 1.7;
+                margin: 0;
+            }
+            .hero-actions {
+                margin-top: 26px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 44px;
+                padding: 0 18px;
+                border-radius: 999px;
+                background: var(--gold);
+                color: var(--navy-dark);
+                font-weight: 900;
+                text-decoration: none;
+            }
+            .button.secondary {
+                background: rgba(255,255,255,0.12);
+                color: var(--white);
+                border: 1px solid rgba(255,255,255,0.35);
+            }
+            .section { padding-top: 54px; padding-bottom: 54px; }
+            .section.soft { background: var(--soft); max-width: none; }
+            .section.soft > .section-inner, .footer-inner {
+                max-width: 1180px;
+                margin: 0 auto;
+                padding-left: 22px;
+                padding-right: 22px;
+            }
+            .section-title {
+                display: flex;
+                align-items: end;
+                justify-content: space-between;
+                gap: 20px;
+                margin-bottom: 24px;
+            }
+            .section-title h2 {
+                margin: 0;
+                color: var(--navy);
+                font-size: clamp(26px, 3vw, 38px);
+                line-height: 1.12;
+            }
+            .section-title p {
+                max-width: 520px;
+                margin: 0;
+                color: var(--muted);
+                line-height: 1.6;
+            }
+            .tax-grid, .project-grid, .news-grid, .values-grid {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 16px;
+            }
+            .card {
+                background: var(--white);
+                border: 1px solid var(--line);
+                border-radius: 16px;
+                overflow: hidden;
+                box-shadow: 0 8px 28px rgba(9,42,66,0.06);
+            }
+            .tax-card {
+                min-height: 155px;
+                padding: 22px;
+                border-top: 5px solid var(--green);
+            }
+            .tax-card h3, .project-card h3, .value-card h3 {
+                margin: 0 0 10px;
+                color: var(--navy);
+                font-size: 19px;
+            }
+            .tax-card p, .project-card p, .value-card p, .feature-copy p {
+                margin: 0;
+                color: var(--muted);
+                line-height: 1.65;
+                font-size: 14px;
+            }
+            .feature {
+                display: grid;
+                grid-template-columns: 0.95fr 1.05fr;
+                gap: 28px;
+                align-items: center;
+                margin-top: 26px;
+            }
+            .feature img {
+                width: 100%;
+                border-radius: 18px;
+                display: block;
+                box-shadow: 0 12px 38px rgba(9,42,66,0.12);
+            }
+            .feature-copy h2 {
+                margin: 0 0 14px;
+                color: var(--navy);
+                font-size: clamp(26px, 3vw, 40px);
+                line-height: 1.12;
+            }
+            .feature-copy p + p { margin-top: 12px; }
+            .read-more {
+                margin-top: 18px;
+                color: var(--green);
+                text-decoration: none;
+                font-weight: 900;
+                display: inline-flex;
+            }
+            .statement {
+                background: var(--navy);
+                color: var(--white);
                 border-radius: 20px;
-                padding: 44px 48px;
-                margin-bottom: 28px;
-                box-shadow: 0 8px 30px rgba(0,0,0,0.04);
+                padding: 34px;
+                margin-bottom: 24px;
                 position: relative;
                 overflow: hidden;
             }
-            .hero::before {
+            .statement::after {
                 content: "";
-                position: absolute; top: 0; left: 0;
-                width: 6px; height: 100%;
-                background: linear-gradient(180deg, #c8a84e, #1a5a3a);
+                position: absolute;
+                width: 180px;
+                height: 180px;
+                right: -50px;
+                bottom: -65px;
+                background: rgba(215,168,63,0.2);
+                border-radius: 50%;
             }
-            .hero .eyebrow {
-                font-size: 13px; font-weight: 800;
-                text-transform: uppercase; letter-spacing: 0.1em;
-                color: #1a5a3a;
-                margin: 0 0 12px;
+            .statement h2 { margin: 0 0 10px; font-size: 34px; }
+            .statement p { margin: 0; max-width: 850px; color: #dce6ef; line-height: 1.7; }
+            .value-card, .project-card {
+                padding: 22px;
             }
-            .hero h1 {
-                margin: 0 0 8px;
-                font-size: clamp(30px, 5vw, 52px);
-                line-height: 1.1;
-                letter-spacing: -0.03em;
-                color: #0b2a3d;
+            .project-card.highlight {
+                border-top: 5px solid var(--gold);
             }
-            .hero h1 .ar { display: block; }
-            .hero h1 .en {
-                display: block;
-                font-size: clamp(20px, 3vw, 30px);
-                font-weight: 500;
-                color: #3a5a6a;
-                letter-spacing: 0;
-                margin-top: 4px;
-            }
-            .hero p {
-                color: #4a6070;
-                line-height: 1.7;
-                font-size: 16px;
-                max-width: 720px;
-                margin: 16px 0 0;
-            }
-            .grid {
+            .integration-panel {
+                background: linear-gradient(135deg, var(--green), #0c5d3b);
+                color: var(--white);
+                border-radius: 20px;
+                padding: 30px;
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-                gap: 18px;
-                margin-bottom: 24px;
+                grid-template-columns: 1.2fr 0.8fr;
+                gap: 24px;
+                align-items: center;
+                margin-top: 30px;
             }
-            .service-card {
-                background: #ffffff;
-                border: 1px solid #e2ddd4;
-                border-radius: 16px;
-                padding: 24px;
-                transition: 0.15s;
-                position: relative;
+            .integration-panel h2 { margin: 0 0 10px; font-size: 30px; }
+            .integration-panel p { margin: 0; color: #e2f1e9; line-height: 1.65; }
+            .integration-actions {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+                gap: 10px;
             }
-            .service-card:hover {
-                border-color: #c8a84e;
-                box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+            .news-card img {
+                width: 100%;
+                height: 150px;
+                object-fit: cover;
+                display: block;
             }
-            .service-card .icon {
-                width: 44px; height: 44px;
-                border-radius: 12px;
-                display: grid; place-items: center;
-                font-size: 20px;
-                margin-bottom: 14px;
-                background: #edebe7;
-            }
-            .service-card h3 {
-                margin: 0 0 6px;
-                font-size: 18px; font-weight: 700;
-                color: #0b2a3d;
-            }
-            .service-card p {
-                margin: 0 0 14px;
-                font-size: 14px; line-height: 1.6;
-                color: #4a6070;
-            }
-            .service-card .status-badge {
-                display: inline-flex;
-                border-radius: 999px;
-                padding: 4px 10px;
-                font-size: 11px; font-weight: 800;
+            .news-card div { padding: 16px; }
+            .news-card time {
+                color: var(--green);
+                font-size: 12px;
+                font-weight: 900;
                 text-transform: uppercase;
-                letter-spacing: 0.06em;
-                background: #e3f0e8;
-                color: #1a5a3a;
             }
-            .service-card .status-badge.sandbox {
-                background: #e8ecf0;
-                color: #3a5a6a;
+            .news-card h3 {
+                margin: 8px 0 0;
+                color: var(--navy);
+                font-size: 16px;
+                line-height: 1.4;
             }
-            .service-card .status-badge.soon {
-                background: #f0ede8;
-                color: #8a7a6a;
+            .partners {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 14px;
+                align-items: center;
             }
-            .service-card a {
-                display: inline-flex; align-items: center; gap: 6px;
-                font-size: 14px; font-weight: 700;
-                color: #0b2a3d;
-                text-decoration: none;
-                padding: 6px 0;
-                border-bottom: 2px solid transparent;
-                transition: 0.1s;
-            }
-            .service-card a:hover { border-bottom-color: #c8a84e; }
-            .notice {
-                background: #faf8f5;
-                border: 1px solid #dad3c8;
+            .partner {
+                min-height: 90px;
+                border: 1px solid var(--line);
                 border-radius: 14px;
-                padding: 18px 22px;
-                display: flex; align-items: flex-start; gap: 12px;
-                font-size: 14px; line-height: 1.6;
-                color: #4a6070;
+                display: grid;
+                place-items: center;
+                background: var(--white);
+                padding: 14px;
+            }
+            .partner img {
+                max-width: 100%;
+                max-height: 58px;
+                object-fit: contain;
+            }
+            footer {
+                background: var(--navy-dark);
+                color: #dce6ef;
+                padding: 42px 0 24px;
+            }
+            .footer-grid {
+                display: grid;
+                grid-template-columns: 1.2fr 0.8fr 0.8fr;
+                gap: 28px;
                 margin-bottom: 28px;
             }
-            .notice strong { color: #0b2a3d; }
-            footer {
-                max-width: 1200px; margin: 0 auto;
-                padding: 24px 24px 32px;
-                border-top: 1px solid #ddd8ce;
-                display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
-                font-size: 13px; color: #6a7f8f;
+            footer h3 { margin: 0 0 12px; color: var(--white); }
+            footer p, footer a {
+                color: #c4d3df;
+                line-height: 1.65;
+                font-size: 14px;
+                text-decoration: none;
             }
-            @media (max-width: 700px) {
-                header { flex-direction: column; align-items: flex-start; }
-                .hero { padding: 28px 24px; }
-                .grid { grid-template-columns: 1fr; }
+            footer a { display: block; margin: 7px 0; }
+            .copyright {
+                border-top: 1px solid rgba(255,255,255,0.12);
+                padding-top: 18px;
+                display: flex;
+                justify-content: space-between;
+                gap: 14px;
+                flex-wrap: wrap;
+                color: #9fb5c6;
+                font-size: 13px;
+            }
+            @media (max-width: 980px) {
+                .masthead, .feature, .integration-panel, .footer-grid { grid-template-columns: 1fr; }
+                .emblem { order: -1; }
+                .tax-grid, .project-grid, .news-grid, .values-grid, .partners { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                .integration-actions { justify-content: flex-start; }
+            }
+            @media (max-width: 640px) {
+                .top-inner, .nav-inner, .section-title, .copyright { align-items: flex-start; flex-direction: column; }
+                .tax-grid, .project-grid, .news-grid, .values-grid, .partners { grid-template-columns: 1fr; }
+                .hero { min-height: 520px; }
+                .site-nav a, .app-links a { padding: 11px 9px; }
             }
         </style>
     </head>
     <body>
-        <div class="top-banner">
-            <span>نظام الفوترة الإلكترونية التجريبي | Electronic Invoicing Prototype System</span>
+        <div class="top-strip">
+            <div class="top-inner">
+                <span>Phone: 183 / 7200555 / 0155771641</span>
+                <span>Email: executive.tax@tax.gov.sd</span>
+                <span>Sudan, Khartoum, P.O. Box 2488</span>
+            </div>
         </div>
 
-        <header>
-            <div class="brand">
-                <div class="emblem">ض</div>
-                <div class="brand-text">
-                    <span class="ar">ديوان الضرائب السوداني</span>
-                    <span class="en">Sudan Taxation Chamber</span>
+        <header class="masthead">
+            <div class="ministry-logo">
+                <img src="https://tax.gov.sd/wp-content/uploads/2025/02/logo.png" alt="Ministry of Finance logo" />
+                <div class="brand-title">
+                    <strong>Ministry of Finance</strong>
+                    <span>Republic of Sudan</span>
                 </div>
             </div>
-            <nav>
-                <a href="/e-invoicing">الفوترة الإلكترونية</a>
-                <a href="/sandbox">Sandbox</a>
-                <a href="/api">API</a>
-            </nav>
+            <div class="emblem">
+                <img src="https://tax.gov.sd/wp-content/uploads/elementor/thumbs/Emblem_of_Sudan_gold.svg-r2zrixl5xmtjzxobz174pbftdf8w0emujfmy7e72ic.png" alt="Sudan emblem" />
+            </div>
+            <div class="tax-brand">
+                <img src="https://tax.gov.sd/wp-content/uploads/2024/05/logoeng.jpg" alt="Sudan Taxation Chamber logo" />
+                <div class="brand-title">
+                    <strong>Sudan Taxation Chamber</strong>
+                    <span>Official digital services portal</span>
+                </div>
+            </div>
         </header>
+
+        <div class="nav-bar">
+            <div class="nav-inner">
+                <nav class="site-nav" aria-label="Official site navigation">
+                    <a href="/">Home</a>
+                    <a href="https://tax.gov.sd/en/about-us-2/">About Tax</a>
+                    <a href="https://tax.gov.sd/en/tax-procedures/">Tax Procedures</a>
+                    <a href="https://tax.gov.sd/en/tax-laws/">Laws &amp; Regulations</a>
+                    <a href="https://tax.gov.sd/en/projects-2/">Projects</a>
+                </nav>
+                <nav class="app-links" aria-label="E-invoice application links">
+                    <a href="/e-invoicing">E-Invoicing</a>
+                    <a href="/sandbox">Sandbox</a>
+                    <a href="/api">API Docs</a>
+                </nav>
+            </div>
+        </div>
 
         <main>
             <section class="hero">
-                <p class="eyebrow">Digital Tax Services | الخدمات الضريبية الرقمية</p>
-                <h1>
-                    <span class="ar">بوابة الخدمات الإلكترونية</span>
-                    <span class="en">Electronic Services Gateway</span>
-                </h1>
-                <p>
-                    مرحباً بكم في بوابة الفوترة الإلكترونية التجريبية لديوان الضرائب السوداني.
-                    يمكن للمكلفين تسجيل الدخول وإدارة أجهزتهم واختبار إصدار الفواتير والإبلاغ عنها.
-                    <br class="en-only" />
-                    Welcome to the STC electronic invoicing prototype. Taxpayers may sign in, manage
-                    device enrollment, and test invoice clearance and reporting.
-                </p>
+                <div class="hero-content">
+                    <span class="eyebrow">Taxation: A Sustainable Source for Development</span>
+                    <h1>Sudan Taxation Chamber digital services</h1>
+                    <p>
+                        A modern tax administration platform supporting transparency, voluntary compliance,
+                        digital transformation, and efficient taxpayer services across Sudan.
+                    </p>
+                    <div class="hero-actions">
+                        <a class="button" href="/e-invoicing">Open E-Invoicing Portal</a>
+                        <a class="button secondary" href="https://tax.gov.sd/en/home/">Visit Official Site</a>
+                    </div>
+                </div>
             </section>
 
-            <div class="grid">
-                <div class="service-card">
-                    <div class="icon">📄</div>
-                    <h3>الفوترة الإلكترونية · E-Invoicing</h3>
-                    <p>Portail d'enregistrement des contribuables, génération de jetons, rapports de factures et soumission en production.</p>
-                    <span class="status-badge">Available</span>
-                    <div style="margin-top:12px"><a href="/e-invoicing">الدخول إلى البوابة →</a></div>
+            <section class="section">
+                <div class="section-title">
+                    <h2>Types of Taxes</h2>
+                    <p>Core tax categories and services provided through the Taxation Chamber.</p>
                 </div>
-
-                <div class="service-card">
-                    <div class="icon">🧪</div>
-                    <h3>Sandbox · بيئة الاختبار</h3>
-                    <p>Developer console for testing invoice validation, clearance, and reporting without mutating production chain state.</p>
-                    <span class="status-badge sandbox">Sandbox</span>
-                    <div style="margin-top:12px"><a href="/sandbox">Open console →</a></div>
+                <div class="tax-grid">
+                    <article class="card tax-card">
+                        <h3>Value Added Tax (VAT)</h3>
+                        <p>Tax applied to the value added through supply chains for eligible goods and services.</p>
+                    </article>
+                    <article class="card tax-card">
+                        <h3>Income Tax</h3>
+                        <p>Taxation for income generated by individuals and organizations under current laws.</p>
+                    </article>
+                    <article class="card tax-card">
+                        <h3>Capital Gains Tax</h3>
+                        <p>Tax procedures covering gains from the disposal or transfer of capital assets.</p>
+                    </article>
+                    <article class="card tax-card">
+                        <h3>Stamp Duty Tax</h3>
+                        <p>Duty applied to selected documents, contracts, and regulated transactions.</p>
+                    </article>
                 </div>
+            </section>
 
-                <div class="service-card">
-                    <div class="icon">📘</div>
-                    <h3>API Reference · الدليل التقني</h3>
-                    <p>Complete integration reference for enrollment, clearance, reporting, and health check endpoints.</p>
-                    <span class="status-badge">Available</span>
-                    <div style="margin-top:12px"><a href="/api">View docs →</a></div>
+            <section class="section soft">
+                <div class="section-inner">
+                    <div class="feature">
+                        <img src="https://tax.gov.sd/wp-content/uploads/2025/02/abouteng-min.jpg" alt="Taxation Chamber office" />
+                        <div class="feature-copy">
+                            <h2>About Taxes</h2>
+                            <p>
+                                Taxes are a vital source of public revenue for the state. They contribute to
+                                financing public services, supporting development projects, and shaping financial
+                                and economic policy.
+                            </p>
+                            <p>
+                                The Taxation Chamber works to promote fairness, transparency, compliance, and
+                                taxpayer awareness through modern digital channels.
+                            </p>
+                            <a class="read-more" href="https://tax.gov.sd/en/about-us-2/">Read more</a>
+                        </div>
+                    </div>
+
+                    <div class="feature">
+                        <div class="feature-copy">
+                            <h2>Secretary-General</h2>
+                            <p>
+                                The Chamber's digital platform reflects its aspiration to develop the tax system
+                                according to good governance, digital transformation, transparency, and accountability.
+                            </p>
+                            <a class="read-more" href="https://tax.gov.sd/en/secretary-general/">Read more</a>
+                        </div>
+                        <img src="https://tax.gov.sd/wp-content/uploads/2025/04/kingeng-1024x576.jpg" alt="Secretary-General" />
+                    </div>
                 </div>
+            </section>
 
-                <div class="service-card">
-                    <div class="icon">🔐</div>
-                    <h3>تسجيل المكلفين · Taxpayer Registration</h3>
-                    <p>Register new taxpayers, update profiles, and manage taxation credentials through the chamber portal.</p>
-                    <span class="status-badge soon">Coming soon</span>
+            <section class="section">
+                <article class="statement">
+                    <h2>Our Motto</h2>
+                    <p>Taxation: A Sustainable Source for Development.</p>
+                </article>
+                <div class="values-grid">
+                    <article class="card value-card">
+                        <h3>Vision</h3>
+                        <p>A modern and efficient tax administration that upholds quality, justice, transparency, and seamless tax obligations.</p>
+                    </article>
+                    <article class="card value-card">
+                        <h3>Mission</h3>
+                        <p>Providing exceptional and efficient tax services to build an informed and committed tax community.</p>
+                    </article>
+                    <article class="card value-card">
+                        <h3>Objectives</h3>
+                        <p>Increase revenue, expand the tax base, promote awareness, and establish strategic partnerships.</p>
+                    </article>
+                    <article class="card value-card">
+                        <h3>Core Values</h3>
+                        <p>Justice, transparency, efficiency, integrity, teamwork, innovation, and continuous modernization.</p>
+                    </article>
                 </div>
+            </section>
 
-                <div class="service-card">
-                    <div class="icon">✅</div>
-                    <h3>شهادات الخصم والتصفية · Tax Clearance</h3>
-                    <p>Request and manage tax clearance certificates for commercial transactions and regulatory compliance.</p>
-                    <span class="status-badge soon">Coming soon</span>
+            <section class="section soft">
+                <div class="section-inner">
+                    <div class="section-title">
+                        <h2>Computing Projects</h2>
+                        <p>Digital transformation initiatives supporting tax operations and taxpayer services.</p>
+                    </div>
+                    <div class="project-grid">
+                        <article class="card project-card">
+                            <h3>Core System Digitization</h3>
+                            <p>Core systems, portal services, and integration with information sources.</p>
+                        </article>
+                        <article class="card project-card highlight">
+                            <h3>Electronic Invoice</h3>
+                            <p>Taxpayer invoice data is generated electronically and submitted in real time to the Tax Authority.</p>
+                        </article>
+                        <article class="card project-card">
+                            <h3>Infrastructure and Networks</h3>
+                            <p>Local networks, wide area networks, data centers, and operational infrastructure.</p>
+                        </article>
+                        <article class="card project-card">
+                            <h3>Electronic Payment</h3>
+                            <p>Multiple electronic payment channels to help taxpayers settle obligations efficiently.</p>
+                        </article>
+                    </div>
+
+                    <div class="integration-panel">
+                        <div>
+                            <h2>E-Invoice Integration Prototype</h2>
+                            <p>
+                                Use this application to enroll devices, test invoice clearance and reporting,
+                                and inspect the public API contract for integration work.
+                            </p>
+                        </div>
+                        <div class="integration-actions">
+                            <a class="button" href="/e-invoicing">Portal</a>
+                            <a class="button secondary" href="/sandbox">Sandbox</a>
+                            <a class="button secondary" href="/api">Swagger API</a>
+                        </div>
+                    </div>
                 </div>
+            </section>
 
-                <div class="service-card">
-                    <div class="icon">💳</div>
-                    <h3>المدفوعات · Payments &amp; Returns</h3>
-                    <p>Submit tax returns, view payment history, and manage outstanding balances with the taxation chamber.</p>
-                    <span class="status-badge soon">Coming soon</span>
+            <section class="section">
+                <div class="section-title">
+                    <h2>Latest News</h2>
+                    <p>Recent public updates from the Taxation Chamber.</p>
                 </div>
-
-                <div class="service-card">
-                    <div class="icon">📊</div>
-                    <h3>لوحة البيانات · Taxpayer Dashboard</h3>
-                    <p>Consolidated view of filings, payments, certificates, and compliance status across all chamber services.</p>
-                    <span class="status-badge soon">Coming soon</span>
+                <div class="news-grid">
+                    <article class="card news-card">
+                        <img src="https://tax.gov.sd/wp-content/uploads/2026/05/news6.jpg" alt="Minister visit" />
+                        <div>
+                            <time>07 May 2026</time>
+                            <h3>Visit of H.E. Minister of Finance Dr. Gibril Ibrahim to the Taxation Chamber headquarters.</h3>
+                        </div>
+                    </article>
+                    <article class="card news-card">
+                        <img src="https://tax.gov.sd/wp-content/uploads/2026/04/dev27_2026.jpeg" alt="E-Invoice system update" />
+                        <div>
+                            <time>04 May 2026</time>
+                            <h3>Resumption of the E-Invoice System.</h3>
+                        </div>
+                    </article>
+                    <article class="card news-card">
+                        <img src="https://tax.gov.sd/wp-content/uploads/2026/04/dev24_2026.jpeg" alt="Taxation Chamber partnership" />
+                        <div>
+                            <time>26 Mar 2026</time>
+                            <h3>Agreement enhancing partnership between the Taxation Chamber and the transport sector.</h3>
+                        </div>
+                    </article>
+                    <article class="card news-card">
+                        <img src="https://tax.gov.sd/wp-content/uploads/2025/02/projectseng.jpg" alt="Taxation projects" />
+                        <div>
+                            <time>Projects</time>
+                            <h3>Plans and programs for tax modernization and digital transformation.</h3>
+                        </div>
+                    </article>
                 </div>
+            </section>
 
-                <div class="service-card">
-                    <div class="icon">🛟</div>
-                    <h3>المساعدة · Help &amp; Support</h3>
-                    <p>Submit support requests, browse integration guides, and contact the chamber technical team.</p>
-                    <span class="status-badge soon">Coming soon</span>
+            <section class="section soft">
+                <div class="section-inner">
+                    <div class="section-title">
+                        <h2>Partners</h2>
+                        <p>Connected public institutions and government services.</p>
+                    </div>
+                    <div class="partners">
+                        <a class="partner" href="https://cbos.gov.sd/"><img src="https://tax.gov.sd/wp-content/uploads/2025/02/bank1-1.jpg" alt="Central Bank of Sudan" /></a>
+                        <a class="partner" href="https://mof.gov.sd/"><img src="https://tax.gov.sd/wp-content/uploads/2025/02/logo.png" alt="Ministry of Finance" /></a>
+                        <a class="partner" href="http://customs.gov.sd/"><img src="https://tax.gov.sd/wp-content/uploads/2025/02/jamarek.jpg" alt="Sudan Customs" /></a>
+                        <a class="partner" href="https://www.moj.gov.sd/"><img src="https://tax.gov.sd/wp-content/uploads/2025/02/law.png" alt="Ministry of Justice" /></a>
+                        <a class="partner" href="https://www.nic.gov.sd/"><img src="https://tax.gov.sd/wp-content/uploads/2025/02/nic.png" alt="National Information Center" /></a>
+                    </div>
                 </div>
-            </div>
-
-            <div class="notice">
-                <strong>⚙️ Prototype notice · إشعار تجريبي:</strong>
-                This system is a prototype for demonstration and development purposes. It is not production-ready without further security, compliance, and operational hardening. | هذا النظام تجريبي لأغراض التطوير والتقييم فقط.
-            </div>
+            </section>
         </main>
 
         <footer>
-            <span>© Sudan Taxation Chamber · ديوان الضرائب السوداني</span>
-            <span>Electronic Invoicing Prototype · الفوترة الإلكترونية التجريبية</span>
+            <div class="footer-inner">
+                <div class="footer-grid">
+                    <div>
+                        <h3>About the Taxation Chamber</h3>
+                        <p>
+                            Taxes aim to achieve social justice by subjecting income to taxation and ensuring that
+                            every capable individual bears a fair share of public expenses and development needs.
+                        </p>
+                    </div>
+                    <div>
+                        <h3>Quick Links</h3>
+                        <a href="https://tax.gov.sd/privacy-policy/">Privacy Policies</a>
+                        <a href="https://tax.gov.sd/terms-policy/">Terms &amp; Conditions</a>
+                        <a href="https://tax.gov.sd/sitemaps/">Site Maps</a>
+                        <a href="https://tax.gov.sd/en/home/">Official Home Page</a>
+                    </div>
+                    <div>
+                        <h3>Contact Us</h3>
+                        <p>Phone: 183 / 7200555 / 0155771641</p>
+                        <p>Email: executive.tax@tax.gov.sd</p>
+                        <p>Sudan, Khartoum, P.O. Box 2488</p>
+                    </div>
+                </div>
+                <div class="copyright">
+                    <span>All Rights Reserved 2026 | Sudan Taxation Chamber</span>
+                    <span>Local e-invoice prototype services: Portal, Sandbox, Swagger API</span>
+                </div>
+            </div>
         </footer>
     </body>
 </html>
