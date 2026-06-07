@@ -35,6 +35,28 @@ pub struct InvoicePayloadDto {
     pub invoice_xml: String,
 }
 
+#[derive(Debug, Default, Deserialize)]
+pub struct InvoiceReportRequestDto {
+    #[serde(default)]
+    pub tin: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub invoice_type: Option<String>,
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
+    pub from: Option<String>,
+    #[serde(default)]
+    pub to: Option<String>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub offset: Option<i64>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct PreparedInvoicePayloadDto {
     pub invoice: String,
@@ -45,7 +67,11 @@ pub struct PreparedInvoicePayloadDto {
 pub struct InvoiceReportDto {
     pub summary: InvoiceReportSummaryDto,
     pub invoices: Vec<InvoiceReportRowDto>,
-    pub latest_limit: usize,
+    pub filtered_total: usize,
+    pub limit: usize,
+    pub offset: usize,
+    pub has_next: bool,
+    pub has_previous: bool,
 }
 
 #[derive(Debug, Serialize)]
